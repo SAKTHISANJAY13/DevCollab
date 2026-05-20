@@ -76,6 +76,7 @@ export type KanbanTask = {
   assignee: KanbanAssignee;
   /** ISO date string */
   dueDate: string;
+  status?: KanbanColumnId;
 };
 
 export const KANBAN_PRIORITIES = ["low", "medium", "high", "urgent"] as const;

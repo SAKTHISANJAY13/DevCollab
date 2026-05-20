@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   closestCorners,
   DndContext,
@@ -21,12 +21,10 @@ import {
 
 import { KanbanColumn } from "@/components/kanban/kanban-column";
 import { KanbanTaskCard } from "@/components/kanban/kanban-task-card";
-import {
-  KANBAN_COLUMN_IDS,
-  initialKanbanColumnOrder,
-  initialKanbanTasks,
-} from "@/lib/kanban/seed";
+import { KANBAN_COLUMN_IDS } from "@/lib/kanban/seed";
 import type { KanbanColumnId, KanbanTask } from "@/types";
+import { useSocket } from "@/hooks/use-socket";
+import { apiClient } from "@/lib/api-client";
 
 function isColumnId(value: string): value is KanbanColumnId {
   return KANBAN_COLUMN_IDS.includes(value as KanbanColumnId);
@@ -56,16 +54,155 @@ const dropAnimation: DropAnimation = {
   }),
 };
 
+const KanbanBoardSkeleton = () => (
+  <div className="grid min-h-[min(70vh,720px)] grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 animate-pulse">
+    {Array.from({ length: 4 }).map((_, i) => (
+      <div key={i} className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 min-h-[500px]">
+        <div className="flex items-center justify-between">
+          <div className="h-5 w-24 rounded bg-muted-foreground/20" />
+          <div className="h-5 w-6 rounded bg-muted-foreground/20" />
+        </div>
+        <div className="space-y-3 mt-4">
+          {Array.from({ length: i + 1 }).map((_, j) => (
+            <div key={j} className="h-28 rounded-lg border border-dashed bg-muted/40 p-4 space-y-3">
+              <div className="h-4 w-3/4 rounded bg-muted-foreground/20" />
+              <div className="h-3 w-1/2 rounded bg-muted-foreground/20" />
+              <div className="flex items-center justify-between pt-2">
+                <div className="h-6 w-12 rounded bg-muted-foreground/20" />
+                <div className="h-6 w-6 rounded-full bg-muted-foreground/20" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 export function KanbanBoard() {
-  const [columns, setColumns] =
-    useState<Record<KanbanColumnId, string[]>>(initialKanbanColumnOrder);
-  const [tasks] = useState<Record<string, KanbanTask>>(() => ({ ...initialKanbanTasks }));
+  const { socket, isConnected } = useSocket();
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [columns, setColumns] = useState<Record<KanbanColumnId, string[]>>({
+    todo: [],
+    "in-progress": [],
+    "in-review": [],
+    done: [],
+  });
+  const [tasks, setTasks] = useState<Record<string, KanbanTask>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  // Fetch tasks on mount (and auto-seed if empty in DB)
+  useEffect(() => {
+    let active = true;
+
+    apiClient<{ tasks: KanbanTask[]; projectId: string }>("/api/tasks")
+      .then((data) => {
+        if (!active) return;
+        setProjectId(data.projectId);
+
+        const newTasks: Record<string, KanbanTask> = {};
+        const newColumns: Record<KanbanColumnId, string[]> = {
+          todo: [],
+          "in-progress": [],
+          "in-review": [],
+          done: [],
+        };
+
+        data.tasks.forEach((t) => {
+          newTasks[t.id] = t;
+          if (t.status && newColumns[t.status]) {
+            newColumns[t.status].push(t.id);
+          }
+        });
+
+        setTasks(newTasks);
+        setColumns(newColumns);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load tasks from API:", err);
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Listen to Socket.IO real-time channel
+  useEffect(() => {
+    if (!socket || !projectId) return;
+
+    // Join room for this project
+    socket.emit("join-project", projectId);
+
+    socket.on("taskCreated", (task: KanbanTask) => {
+      setTasks((prev) => ({ ...prev, [task.id]: task }));
+      setColumns((prev) => {
+        const col = task.status || "todo";
+        const exists = findColumnForTask(task.id, prev);
+        if (exists) return prev;
+        return {
+          ...prev,
+          [col]: [...prev[col], task.id],
+        };
+      });
+    });
+
+    socket.on("taskUpdated", (task: KanbanTask) => {
+      setTasks((prev) => ({ ...prev, [task.id]: task }));
+    });
+
+    socket.on("taskMoved", (task: KanbanTask) => {
+      setTasks((prev) => ({ ...prev, [task.id]: task }));
+      setColumns((prev) => {
+        const newStatus = task.status || "todo";
+        const oldStatus = findColumnForTask(task.id, prev);
+
+        if (oldStatus === newStatus) return prev;
+
+        const next = { ...prev };
+        if (oldStatus) {
+          next[oldStatus] = next[oldStatus].filter((id) => id !== task.id);
+        }
+        if (!next[newStatus].includes(task.id)) {
+          next[newStatus] = [...next[newStatus], task.id];
+        }
+        return next;
+      });
+    });
+
+    socket.on("taskDeleted", ({ taskId }: { taskId: string }) => {
+      setTasks((prev) => {
+        const next = { ...prev };
+        delete next[taskId];
+        return next;
+      });
+      setColumns((prev) => {
+        const next = { ...prev };
+        for (const col of KANBAN_COLUMN_IDS) {
+          if (next[col].includes(taskId)) {
+            next[col] = next[col].filter((id) => id !== taskId);
+          }
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      socket.emit("leave-project", projectId);
+      socket.off("taskCreated");
+      socket.off("taskUpdated");
+      socket.off("taskMoved");
+      socket.off("taskDeleted");
+    };
+  }, [socket, projectId]);
 
   const activeTask = activeId ? tasks[activeId] : null;
 
@@ -84,12 +221,12 @@ export function KanbanBoard() {
 
     if (activeTaskId === overId) return;
 
+    const activeColumn = findColumnForTask(activeTaskId, columns);
+    const overColumn = resolveOverColumn(overId, columns);
+
+    if (!activeColumn || !overColumn) return;
+
     setColumns((prev) => {
-      const activeColumn = findColumnForTask(activeTaskId, prev);
-      const overColumn = resolveOverColumn(overId, prev);
-
-      if (!activeColumn || !overColumn) return prev;
-
       if (activeColumn === overColumn) {
         const list = prev[activeColumn];
         const activeIndex = list.indexOf(activeTaskId);
@@ -127,38 +264,67 @@ export function KanbanBoard() {
         [overColumn]: to,
       };
     });
+
+    // Persist status change to backend
+    if (activeColumn !== overColumn) {
+      apiClient(`/api/tasks/${activeTaskId}`, {
+        method: "PATCH",
+        body: { status: overColumn },
+      }).catch((err) => {
+        console.error("Failed to persist task status change:", err);
+      });
+    }
   }
 
   function onDragCancel() {
     setActiveId(null);
   }
 
+  if (isLoading) {
+    return <KanbanBoardSkeleton />;
+  }
+
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragCancel={onDragCancel}
-    >
-      <div className="grid min-h-[min(70vh,720px)] grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {KANBAN_COLUMN_IDS.map((columnId) => (
-          <KanbanColumn
-            key={columnId}
-            columnId={columnId}
-            taskIds={columns[columnId]}
-            tasks={tasks}
-          />
-        ))}
+    <div className="space-y-4">
+      {/* Live Connectivity Bar */}
+      <div className="flex items-center justify-between rounded-lg border bg-muted/10 px-4 py-2">
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-yellow-500 animate-bounce"}`} />
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {isConnected ? "Realtime Live Sync" : "Reconnecting server..."}
+          </span>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Project ID: <span className="font-mono text-foreground">{projectId}</span>
+        </div>
       </div>
 
-      <DragOverlay dropAnimation={dropAnimation}>
-        {activeTask ? (
-          <div className="max-w-[280px] rotate-2 cursor-grabbing opacity-95 shadow-xl">
-            <KanbanTaskCard task={activeTask} isOverlay />
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragCancel={onDragCancel}
+      >
+        <div className="grid min-h-[min(70vh,720px)] grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {KANBAN_COLUMN_IDS.map((columnId) => (
+            <KanbanColumn
+              key={columnId}
+              columnId={columnId}
+              taskIds={columns[columnId] || []}
+              tasks={tasks}
+            />
+          ))}
+        </div>
+
+        <DragOverlay dropAnimation={dropAnimation}>
+          {activeTask ? (
+            <div className="max-w-[280px] rotate-2 cursor-grabbing opacity-95 shadow-xl">
+              <KanbanTaskCard task={activeTask} isOverlay />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
   );
 }

@@ -16,19 +16,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const { taskId } = await params
-
-  try {
-    // delete logic here
-
-    return Response.json({
-      success: true,
-    })
-  } catch (error) {
-    return Response.json(
-      { error: "Failed to delete task" },
-      { status: 500 }
-    )
-  }
+  const { taskId } = await params;
+  return taskController.remove(taskId);
 }
 

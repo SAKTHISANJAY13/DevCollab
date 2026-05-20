@@ -79,7 +79,7 @@ export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
         </p>
         {dashboardNav.map((item) => {
           const Icon = iconMap[item.icon] ?? LayoutDashboard;
-          const active = navLinkActive(item.href, pathname);
+          const active = navLinkActive(item.href, pathname ?? "");
           return (
             <Link
               key={item.href}
