@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # DevCollab
 
 Modern SaaS dashboard built with **Next.js 15**, **App Router**, **TypeScript**, and **Tailwind CSS v4**.
@@ -44,3 +45,6 @@ Open [http://localhost:3000](http://localhost:3000).
 - **Services** encapsulate API calls; pages and server components consume services instead of raw `fetch`.
 - **Types** live in a single module for domain models shared across layers.
 - **Components** are split by responsibility: `ui` (primitives), `layout` (shell), `shared` (composites).
+=======
+# DevCollab
+>>>>>>> 0d5b4b89fb498df1dc741cdaf64f43d0a8f790d0
