@@ -1,6 +1,7 @@
 import { io, type ManagerOptions, type Socket } from "socket.io-client";
 
 const LOG_PREFIX = "[socket:client]";
+const DEFAULT_PATH = "/api/socket/io";
 
 type SocketGlobal = typeof globalThis & {
   __socket_io_client?: Socket;
@@ -9,8 +10,10 @@ type SocketGlobal = typeof globalThis & {
 const g = globalThis as SocketGlobal;
 
 export type SocketClientOptions = {
-  /** Full base URL of the Socket.IO server (no path; default path /socket.io is used) */
+  /** Full base URL of the Socket.IO server (defaults to current origin) */
   url?: string;
+  /** Socket.IO server path (defaults to Next.js API Socket.IO path) */
+  path?: string;
   /** Extra socket.io-client options */
   socketOptions?: Partial<ManagerOptions>;
 };
@@ -27,8 +30,7 @@ function resolveDefaultUrl(): string {
   if (typeof window !== "undefined") {
     const envUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
     if (envUrl) return envUrl.replace(/\/$/, "");
-    const port = process.env.NEXT_PUBLIC_SOCKET_PORT ?? "3001";
-    return `${window.location.protocol}//${window.location.hostname}:${port}`;
+    return window.location.origin;
   }
   return process.env.NEXT_PUBLIC_SOCKET_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:3000";
 }
@@ -52,16 +54,19 @@ export function getSocketClient(options: SocketClientOptions = {}): Socket | nul
   }
 
   const url = options.url ?? resolveDefaultUrl();
+  const path = options.path ?? DEFAULT_PATH;
 
   const socket = io(url, {
-    path: "/socket.io",
+    path,
+    addTrailingSlash: false,
     autoConnect: true,
     transports: ["websocket", "polling"],
+    reconnection: true,
     ...options.socketOptions,
   });
 
   socket.on("connect", () => {
-    logInfo("connected", { id: socket.id, url });
+    logInfo("connected", { id: socket.id, url, path });
   });
 
   socket.on("disconnect", (reason) => {

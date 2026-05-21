@@ -80,8 +80,10 @@ const KanbanBoardSkeleton = () => (
 );
 
 export function KanbanBoard() {
-  const { socket, isConnected } = useSocket();
   const [projectId, setProjectId] = useState<string | null>(null);
+  const { socket, isConnected } = useSocket({
+    projectId: projectId ?? undefined,
+  });
   const [columns, setColumns] = useState<Record<KanbanColumnId, string[]>>({
     todo: [],
     "in-progress": [],
@@ -137,12 +139,9 @@ export function KanbanBoard() {
 
   // Listen to Socket.IO real-time channel
   useEffect(() => {
-    if (!socket || !projectId) return;
+    if (!socket) return;
 
-    // Join room for this project
-    socket.emit("join-project", projectId);
-
-    socket.on("taskCreated", (task: KanbanTask) => {
+    const onTaskCreated = (task: KanbanTask) => {
       setTasks((prev) => ({ ...prev, [task.id]: task }));
       setColumns((prev) => {
         const col = task.status || "todo";
@@ -153,13 +152,13 @@ export function KanbanBoard() {
           [col]: [...prev[col], task.id],
         };
       });
-    });
+    };
 
-    socket.on("taskUpdated", (task: KanbanTask) => {
+    const onTaskUpdated = (task: KanbanTask) => {
       setTasks((prev) => ({ ...prev, [task.id]: task }));
-    });
+    };
 
-    socket.on("taskMoved", (task: KanbanTask) => {
+    const onTaskMoved = (task: KanbanTask) => {
       setTasks((prev) => ({ ...prev, [task.id]: task }));
       setColumns((prev) => {
         const newStatus = task.status || "todo";
@@ -176,9 +175,9 @@ export function KanbanBoard() {
         }
         return next;
       });
-    });
+    };
 
-    socket.on("taskDeleted", ({ taskId }: { taskId: string }) => {
+    const onTaskDeleted = ({ taskId }: { taskId: string }) => {
       setTasks((prev) => {
         const next = { ...prev };
         delete next[taskId];
@@ -193,16 +192,20 @@ export function KanbanBoard() {
         }
         return next;
       });
-    });
+    };
+
+    socket.on("taskCreated", onTaskCreated);
+    socket.on("taskUpdated", onTaskUpdated);
+    socket.on("taskMoved", onTaskMoved);
+    socket.on("taskDeleted", onTaskDeleted);
 
     return () => {
-      socket.emit("leave-project", projectId);
-      socket.off("taskCreated");
-      socket.off("taskUpdated");
-      socket.off("taskMoved");
-      socket.off("taskDeleted");
+      socket.off("taskCreated", onTaskCreated);
+      socket.off("taskUpdated", onTaskUpdated);
+      socket.off("taskMoved", onTaskMoved);
+      socket.off("taskDeleted", onTaskDeleted);
     };
-  }, [socket, projectId]);
+  }, [socket]);
 
   const activeTask = activeId ? tasks[activeId] : null;
 
@@ -267,11 +270,54 @@ export function KanbanBoard() {
 
     // Persist status change to backend
     if (activeColumn !== overColumn) {
+      const activeIndex = columns[activeColumn].indexOf(activeTaskId);
+
+      setTasks((prev) => {
+        const existing = prev[activeTaskId];
+        if (!existing) return prev;
+        return {
+          ...prev,
+          [activeTaskId]: {
+            ...existing,
+            status: overColumn,
+          },
+        };
+      });
+
       apiClient(`/api/tasks/${activeTaskId}`, {
         method: "PATCH",
         body: { status: overColumn },
       }).catch((err) => {
         console.error("Failed to persist task status change:", err);
+        setTasks((prev) => {
+          const existing = prev[activeTaskId];
+          if (!existing) return prev;
+          return {
+            ...prev,
+            [activeTaskId]: {
+              ...existing,
+              status: activeColumn,
+            },
+          };
+        });
+
+        setColumns((prev) => {
+          const next: Record<KanbanColumnId, string[]> = { ...prev };
+          for (const col of KANBAN_COLUMN_IDS) {
+            if (next[col].includes(activeTaskId)) {
+              next[col] = next[col].filter((id) => id !== activeTaskId);
+            }
+          }
+
+          const list = [...next[activeColumn]];
+          const insertAt = activeIndex < 0 ? list.length : Math.min(activeIndex, list.length);
+          list.splice(insertAt, 0, activeTaskId);
+
+          return {
+            ...next,
+            [activeColumn]: list,
+          };
+        });
       });
     }
   }

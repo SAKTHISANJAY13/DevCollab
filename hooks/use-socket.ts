@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Socket } from "socket.io-client";
 
-import { CLIENT_SOCKET_EVENTS, type JoinProjectPayload } from "@/events/task-events";
 import { disconnectSocketClient, getSocketClient, type SocketClientOptions } from "@/lib/socket/socket-client";
 
 export type UseSocketOptions = SocketClientOptions & {
@@ -25,27 +24,30 @@ export type UseSocketResult = {
  * Uses the singleton client from `getSocketClient` to avoid duplicate connections.
  */
 export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
-  const { projectId, disconnectOnUnmount = false, ...clientOptions } = options;
+  const { projectId, disconnectOnUnmount = false, url, path, socketOptions } = options;
   const [isConnected, setIsConnected] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const socketOptionsRef = useRef(socketOptions);
+
+  useEffect(() => {
+    socketOptionsRef.current = socketOptions;
+  }, [socketOptions]);
 
   const joinProject = useCallback((pid: string) => {
     const socket = socketRef.current;
     if (!socket?.connected) return;
-    const payload: JoinProjectPayload = { projectId: pid };
-    socket.emit(CLIENT_SOCKET_EVENTS.joinProject, payload);
+    socket.emit("join-project", pid);
   }, []);
 
   const leaveProject = useCallback((pid: string) => {
     const socket = socketRef.current;
     if (!socket?.connected) return;
-    const payload: JoinProjectPayload = { projectId: pid };
-    socket.emit(CLIENT_SOCKET_EVENTS.leaveProject, payload);
+    socket.emit("leave-project", pid);
   }, []);
 
   useEffect(() => {
-    const client = getSocketClient(clientOptions);
+    const client = getSocketClient({ url, path, socketOptions: socketOptionsRef.current });
     socketRef.current = client;
     setSocket(client);
 
@@ -83,7 +85,7 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketResult {
         setSocket(null);
       }
     };
-  }, [disconnectOnUnmount, joinProject, leaveProject, projectId, clientOptions.url]);
+  }, [disconnectOnUnmount, joinProject, leaveProject, projectId, url, path]);
 
   return {
     socket,

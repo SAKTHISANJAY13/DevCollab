@@ -1,7 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { io as ClientIO, Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
+
+import { disconnectSocketClient, getSocketClient } from "@/lib/socket/socket-client";
 
 type SocketContextType = {
   socket: Socket | null;
@@ -20,28 +22,28 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Establish connection to the Next.js hosted Socket.IO instance
-    const socketInstance = ClientIO({
-      path: "/api/socket/io",
-      addTrailingSlash: false,
-      autoConnect: true,
-      transports: ["websocket", "polling"],
-    });
+    const socketInstance = getSocketClient();
+    if (!socketInstance) return;
 
-    socketInstance.on("connect", () => {
+    const onConnect = () => {
       setIsConnected(true);
       console.log("[Socket.IO Client] Connected to real-time server.");
-    });
+    };
 
-    socketInstance.on("disconnect", () => {
+    const onDisconnect = () => {
       setIsConnected(false);
       console.log("[Socket.IO Client] Disconnected from real-time server.");
-    });
+    };
+
+    socketInstance.on("connect", onConnect);
+    socketInstance.on("disconnect", onDisconnect);
 
     setSocket(socketInstance);
 
     return () => {
-      socketInstance.disconnect();
+      socketInstance.off("connect", onConnect);
+      socketInstance.off("disconnect", onDisconnect);
+      disconnectSocketClient();
     };
   }, []);
 
