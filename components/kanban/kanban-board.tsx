@@ -142,6 +142,7 @@ export function KanbanBoard() {
     if (!socket) return;
 
     const onTaskCreated = (task: KanbanTask) => {
+      console.log(`[Socket.IO Client] Event received: "taskCreated"`, task);
       setTasks((prev) => ({ ...prev, [task.id]: task }));
       setColumns((prev) => {
         const col = task.status || "todo";
@@ -155,10 +156,12 @@ export function KanbanBoard() {
     };
 
     const onTaskUpdated = (task: KanbanTask) => {
+      console.log(`[Socket.IO Client] Event received: "taskUpdated"`, task);
       setTasks((prev) => ({ ...prev, [task.id]: task }));
     };
 
     const onTaskMoved = (task: KanbanTask) => {
+      console.log(`[Socket.IO Client] Event received: "taskMoved"`, task);
       setTasks((prev) => ({ ...prev, [task.id]: task }));
       setColumns((prev) => {
         const newStatus = task.status || "todo";
@@ -178,6 +181,7 @@ export function KanbanBoard() {
     };
 
     const onTaskDeleted = ({ taskId }: { taskId: string }) => {
+      console.log(`[Socket.IO Client] Event received: "taskDeleted"`, { taskId });
       setTasks((prev) => {
         const next = { ...prev };
         delete next[taskId];

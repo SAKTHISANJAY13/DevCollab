@@ -6,8 +6,9 @@ declare global {
 }
 
 export const initSocketIO = (server: NetServer) => {
-  if (globalThis.io) {
-    return globalThis.io;
+  const existingIo = globalThis.io || (process as unknown as { io?: SocketIOServer }).io;
+  if (existingIo) {
+    return existingIo;
   }
 
   const ioServer = new SocketIOServer(server, {
@@ -17,6 +18,8 @@ export const initSocketIO = (server: NetServer) => {
       origin: "*",
     },
   });
+
+  console.log("[Socket.IO] Socket server initialized");
 
   ioServer.on("connection", (socket) => {
     const transport = socket.conn.transport.name;
@@ -52,9 +55,10 @@ export const initSocketIO = (server: NetServer) => {
   });
 
   globalThis.io = ioServer;
+  (process as unknown as { io?: SocketIOServer }).io = ioServer;
   return ioServer;
 };
 
 export const getIO = (): SocketIOServer | undefined => {
-  return globalThis.io;
+  return globalThis.io || (process as unknown as { io?: SocketIOServer }).io;
 };

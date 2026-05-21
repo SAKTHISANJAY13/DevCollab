@@ -31,6 +31,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponseW
 
     // Trigger asynchronous initialization of the messaging broker (Redis etc.)
     await realtimeBroker.init();
+  } else {
+    // If the HTTP server already has Socket.IO but our global/process singletons are not set (e.g. after hot reload)
+    if (!globalThis.io || !(process as unknown as { io?: SocketIOServer }).io) {
+      console.log("[Socket.IO] Restoring Socket.IO singleton references after hot reload...");
+      globalThis.io = res.socket.server.io;
+      (process as unknown as { io?: SocketIOServer }).io = res.socket.server.io;
+    }
   }
 
   res.end();
