@@ -447,7 +447,7 @@ export function DashboardOverview({
 
       {/* AI Assistant Dialog */}
       <Dialog open={isAiOpen} onOpenChange={setIsAiOpen}>
-        <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden flex flex-col h-[520px]">
+        <DialogContent className="sm:max-w-120 p-0 overflow-hidden flex flex-col h-130">
           <div className="p-4 border-b border-border/50 bg-secondary/20 flex items-center gap-2 shrink-0">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
               <Bot className="h-4 w-4" />

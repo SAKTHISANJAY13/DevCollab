@@ -26,7 +26,7 @@ interface ActivityFeedProps {
 export function ActivityFeed({ activities, className }: ActivityFeedProps) {
   return (
     <div className={cn("space-y-6", className)}>
-      <div className="relative pl-6 space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[1px] before:bg-border/50">
+      <div className="relative pl-6 space-y-6 before:absolute before:left-2.75 before:top-2 before:bottom-2 before:w-px before:bg-border/50">
         {activities.map((activity) => {
           const Icon = iconMap[activity.type] || GitCommit;
           const iconColorClass = colorMap[activity.type] || "text-muted-foreground bg-muted";
@@ -36,7 +36,7 @@ export function ActivityFeed({ activities, className }: ActivityFeedProps) {
               {/* Timeline marker */}
               <div
                 className={cn(
-                  "absolute -left-[27px] top-1.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background text-[10px] transition-transform duration-200 group-hover/item:scale-110",
+                  "absolute -left-6.75 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background text-[10px] transition-transform duration-200 group-hover/item:scale-110",
                   iconColorClass
                 )}
               >
@@ -79,10 +79,10 @@ export function ActivityFeed({ activities, className }: ActivityFeedProps) {
 
 export function ActivityFeedSkeleton() {
   return (
-    <div className="relative pl-6 space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[1px] before:bg-border/40 animate-pulse">
+    <div className="relative pl-6 space-y-6 before:absolute before:left-2.75 before:top-2 before:bottom-2 before:w-px before:bg-border/40 animate-pulse">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="relative">
-          <div className="absolute -left-[27px] top-1.5 h-6 w-6 rounded-full border border-border/40 bg-muted/40" />
+          <div className="absolute -left-6.75 top-1.5 h-6 w-6 rounded-full border border-border/40 bg-muted/40" />
           <div className="space-y-2 rounded-lg border border-border/20 bg-card/5 p-3">
             <div className="flex justify-between items-center">
               <div className="h-3 w-40 rounded bg-muted/60" />

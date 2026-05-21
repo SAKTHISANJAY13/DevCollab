@@ -24,14 +24,14 @@ export function ProjectOverviewCard({
     <Link
       href={`/dashboard/projects?focus=${id}`}
       className={cn(
-        "group relative block overflow-hidden rounded-xl border border-border/50 bg-gradient-to-br from-card/40 to-card/10 p-5 transition-all duration-300 hover:border-border hover:bg-card/50 hover:shadow-lg hover:shadow-black/30",
+        "group relative block overflow-hidden rounded-xl border border-border/50 bg-linear-to-br from-card/40 to-card/10 p-5 transition-all duration-300 hover:border-border hover:bg-card/50 hover:shadow-lg hover:shadow-black/30",
         className
       )}
     >
       {/* Decorative background glow matching the project's accent */}
       <div
         className={cn(
-          "pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-gradient-to-br blur-3xl opacity-30 transition-opacity duration-300 group-hover:opacity-50",
+          "pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-linear-to-br blur-3xl opacity-30 transition-opacity duration-300 group-hover:opacity-50",
           accentColor
         )}
       />
@@ -71,7 +71,7 @@ export function ProjectOverviewCard({
         </div>
         <div className="h-2 w-full rounded-full bg-muted/50 overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-primary to-indigo-400 transition-all duration-500 ease-out"
+            className="h-full rounded-full bg-linear-to-r from-primary to-indigo-400 transition-all duration-500 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>

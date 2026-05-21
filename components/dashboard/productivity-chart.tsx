@@ -48,7 +48,7 @@ export function ProductivityChart({ data, className }: ProductivityChartProps) {
         </div>
       </div>
 
-      <div className="h-[260px] w-full">
+      <div className="h-65 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={data}
@@ -151,7 +151,7 @@ export function ProductivityChartSkeleton() {
           <div className="h-3 w-48 rounded bg-muted/60" />
         </div>
       </div>
-      <div className="h-[260px] w-full flex items-end justify-between pt-6 pr-2">
+      <div className="h-65 w-full flex items-end justify-between pt-6 pr-2">
         <div className="w-[10%] h-[20%] bg-muted/40 rounded-t" />
         <div className="w-[10%] h-[40%] bg-muted/40 rounded-t" />
         <div className="w-[10%] h-[35%] bg-muted/40 rounded-t" />
