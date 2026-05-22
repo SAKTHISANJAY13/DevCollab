@@ -6,7 +6,7 @@ import { workspaceSummary } from "@/lib/constants";
 
 export function WorkspaceSection() {
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-card via-card to-secondary/40 p-6 shadow-sm sm:p-8">
+    <section className="relative overflow-hidden rounded-2xl border border-border/60 bg-linear-to-br from-card via-card to-secondary/40 p-6 shadow-sm sm:p-8">
       <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" aria-hidden />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl space-y-3">
@@ -38,7 +38,7 @@ export function WorkspaceSection() {
             href="/dashboard/team"
             className={buttonClassName({
               className:
-                "w-full shadow-lg shadow-primary/20 sm:w-auto sm:min-w-[10rem] justify-center sm:justify-center",
+                "w-full shadow-lg shadow-primary/20 sm:w-auto sm:min-w-40 justify-center sm:justify-center",
             })}
           >
             Invite people

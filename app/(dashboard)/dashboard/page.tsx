@@ -1,32 +1,25 @@
 import type { Metadata } from "next";
-
-import { ProjectsSection } from "@/components/dashboard/projects-section";
-import { WorkspaceSection } from "@/components/dashboard/workspace-section";
-import { PageHeader } from "@/components/shared/page-header";
-import { StatCard } from "@/components/shared/stat-card";
-import { dashboardStats } from "@/lib/constants";
+import { currentUser } from "@clerk/nextjs/server";
+import { DashboardOverview } from "@/components/dashboard/dashboard-overview";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "Dashboard Overview",
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  // Fetch current user from Clerk context on the server side
+  const user = await currentUser();
+
+  // Determine user display name
+  const name = user
+    ? user.firstName
+      ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`
+      : user.username || "Developer"
+    : "Developer";
+
+  const avatarUrl = user?.imageUrl;
+
   return (
-    <div className="space-y-10">
-      <PageHeader
-        title="Overview"
-        description="Track activity across your workspace at a glance."
-      />
-
-      <WorkspaceSection />
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {dashboardStats.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
-        ))}
-      </section>
-
-      <ProjectsSection />
-    </div>
+    <DashboardOverview userDisplayName={name} userAvatarUrl={avatarUrl} />
   );
 }

@@ -154,7 +154,7 @@ export function KanbanBoard() {
 
       <DragOverlay dropAnimation={dropAnimation}>
         {activeTask ? (
-          <div className="max-w-[280px] rotate-2 cursor-grabbing opacity-95 shadow-xl">
+          <div className="max-w-70 rotate-2 cursor-grabbing opacity-95 shadow-xl">
             <KanbanTaskCard task={activeTask} isOverlay />
           </div>
         ) : null}
