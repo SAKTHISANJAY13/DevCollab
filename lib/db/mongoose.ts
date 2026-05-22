@@ -10,7 +10,7 @@ function getMongoUri(): string {
 
 type MongooseCache = {
   conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
+  promise: Promise<typeof mongoose | null> | null;
 };
 
 declare global {
@@ -24,6 +24,8 @@ const globalCache = globalThis.__mongooseCache ?? {
 
 globalThis.__mongooseCache = globalCache;
 
+export let isMockMode = false;
+
 /**
  * Reusable cached Mongoose connection.
  *
@@ -32,19 +34,57 @@ globalThis.__mongooseCache = globalCache;
  * - Safe in Next.js dev (hot reload) by caching on globalThis.
  */
 export async function connectMongoose() {
-  if (globalCache.conn) return globalCache.conn;
+  try {
+    if (globalCache.conn) {
+      isMockMode = false;
+      return globalCache.conn;
+    }
 
-  if (!globalCache.promise) {
-    const uri = getMongoUri();
-    globalCache.promise = mongoose
-      .connect(uri, {
-        // Keep config minimal; override via env if needed.
-        bufferCommands: false,
-      })
-      .then((m) => m);
+    if (!globalCache.promise) {
+      let uri: string;
+      try {
+        uri = getMongoUri();
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error("MongoDB connection failed:", errMsg);
+        console.log("MongoDB unavailable — switching to mock mode");
+        isMockMode = true;
+        return null;
+      }
+
+      globalCache.promise = mongoose
+        .connect(uri, {
+          // Keep config minimal; override via env if needed.
+          bufferCommands: false,
+          serverSelectionTimeoutMS: 2000, // Short timeout for fast failover
+        })
+        .then((m) => {
+          isMockMode = false;
+          globalCache.conn = m;
+          return m;
+        })
+        .catch((err) => {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.error("MongoDB connection failed:", errMsg);
+          console.log("MongoDB unavailable — switching to mock mode");
+          isMockMode = true;
+          globalCache.promise = null; // Clear promise so we can retry on next request
+          return null;
+        });
+    }
+
+    const conn = await globalCache.promise;
+    if (!conn) {
+      isMockMode = true;
+      return null;
+    }
+    return conn;
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("MongoDB connection failed:", errMsg);
+    console.log("MongoDB unavailable — switching to mock mode");
+    isMockMode = true;
+    globalCache.promise = null;
+    return null;
   }
-
-  globalCache.conn = await globalCache.promise;
-  return globalCache.conn;
 }
-
