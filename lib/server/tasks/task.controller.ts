@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { auth } from "@clerk/nextjs/server";
 
 import { TASK_PRIORITIES, TASK_STATUSES } from "@/lib/db/models";
 import { taskService } from "@/lib/server/tasks/task.service";
 import { realtimeBroker } from "@/lib/server/realtime-broker";
+import { getCurrentMongoUser } from "@/lib/server/auth/getCurrentMongoUser";
+import { activityService } from "@/lib/server/services/activity.service";
 
 const objectIdSchema = z
   .string()
@@ -39,11 +40,11 @@ const updateTaskBodySchema = z.object({
 });
 
 export async function requireAuth() {
-  const { userId } = await auth();
-  if (!userId) {
+  const user = await getCurrentMongoUser();
+  if (!user) {
     return { ok: false as const, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  return { ok: true as const, userId };
+  return { ok: true as const, user };
 }
 
 interface SeededAssignee {
@@ -105,7 +106,6 @@ export const taskController = {
     const json = await req.json().catch(() => null);
     const parsed = createTaskBodySchema.safeParse(json);
     if (!parsed.success) {
-      console.log("TASK API DEBUG: Validation failed in create task. Issues:", parsed.error.flatten());
       return NextResponse.json(
         { error: "Invalid request", issues: parsed.error.flatten() },
         { status: 400 },
@@ -117,12 +117,29 @@ export const taskController = {
       description: parsed.data.description ?? "",
       assigneeId: parsed.data.assigneeId || undefined,
       dueDate: parsed.data.dueDate || undefined,
+      createdBy: authed.user._id.toString(),
     });
 
     const mapped = mapTaskDocToKanbanTask(doc);
 
-    // Publish realtime update
-    if (mapped) {
+    // Publish realtime update and log activity
+    if (mapped && doc) {
+      const initials = authed.user.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || "U";
+
+      await activityService.create({
+        workspaceId: doc.workspaceId.toString(),
+        projectId: doc.projectId.toString(),
+        taskId: doc._id.toString(),
+        user: { name: authed.user.name, initials, avatarUrl: authed.user.avatarUrl },
+        action: "created task",
+        target: doc.title,
+      });
+
       await realtimeBroker.publish(doc.projectId.toString(), "taskCreated", mapped);
     }
 
@@ -136,7 +153,6 @@ export const taskController = {
     const json = await req.json().catch(() => null);
     const parsed = updateTaskBodySchema.safeParse(json);
     if (!parsed.success) {
-      console.log("TASK API DEBUG: Validation failed in update task. Issues:", parsed.error.flatten());
       return NextResponse.json(
         { error: "Invalid request", issues: parsed.error.flatten() },
         { status: 400 },
@@ -160,9 +176,27 @@ export const taskController = {
 
     const mapped = mapTaskDocToKanbanTask(updated);
 
-    // Publish realtime update
+    // Publish realtime update and log activity
     if (mapped) {
       const eventName = originalStatus !== updated.status ? "taskMoved" : "taskUpdated";
+      const actionStr = originalStatus !== updated.status ? `moved task to ${updated.status}` : "updated task";
+      
+      const initials = authed.user.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || "U";
+
+      await activityService.create({
+        workspaceId: updated.workspaceId.toString(),
+        projectId: updated.projectId.toString(),
+        taskId: updated._id.toString(),
+        user: { name: authed.user.name, initials, avatarUrl: authed.user.avatarUrl },
+        action: actionStr,
+        target: updated.title,
+      });
+
       await realtimeBroker.publish(updated.projectId.toString(), eventName, mapped);
     }
 
@@ -176,6 +210,24 @@ export const taskController = {
     const deleted = await taskService.remove(taskId);
     if (!deleted) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    // Log activity
+    if (deleted) {
+      const initials = authed.user.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2) || "U";
+
+      await activityService.create({
+        workspaceId: deleted.workspaceId.toString(),
+        projectId: deleted.projectId.toString(),
+        user: { name: authed.user.name, initials, avatarUrl: authed.user.avatarUrl },
+        action: "deleted task",
+        target: deleted.title,
+      });
     }
 
     // Publish realtime update
@@ -194,46 +246,14 @@ export const taskController = {
     const url = new URL(req.url);
     const projectIdParam = url.searchParams.get("projectId") ?? "";
 
-    // 1. If no projectId is passed, we fetch all tasks to avoid 400 error.
+    // 1. If no projectId is passed, we return empty tasks to avoid 400 or dummy tasks.
     if (!projectIdParam || projectIdParam === "undefined" || projectIdParam === "null") {
-      console.log("TASK API DEBUG: No projectId provided. Using fallback behavior.");
-      const allTasks = await taskService.listByProject({});
-      
-      if (allTasks.length === 0) {
-        console.log("TASK API DEBUG: Database is empty. Returning mock demo tasks.");
-        return NextResponse.json({
-          projectId: "000000000000000000000000",
-          tasks: [
-            {
-              id: "mock-task-1",
-              title: "Demo Task: Welcome to DevCollab",
-              status: "todo",
-              priority: "high",
-              assignee: { id: "unassigned", name: "Unassigned", initials: "U" },
-              dueDate: new Date().toISOString().split("T")[0]
-            },
-            {
-              id: "mock-task-2",
-              title: "Demo Task: Explore Kanban board",
-              status: "in-progress",
-              priority: "medium",
-              assignee: { id: "unassigned", name: "Unassigned", initials: "U" },
-              dueDate: ""
-            }
-          ]
-        }, { status: 200 });
-      }
-
-      const mappedTasks = allTasks.map(mapTaskDocToKanbanTask).filter(Boolean);
-      // Try to extract a projectId from the first task if available
-      const fallbackProjectId = (allTasks[0] as { projectId?: { toString(): string } }).projectId?.toString() || "000000000000000000000000";
-      return NextResponse.json({ tasks: mappedTasks, projectId: fallbackProjectId }, { status: 200 });
+      return NextResponse.json({ tasks: [], projectId: "000000000000000000000000" }, { status: 200 });
     }
 
     // 2. Validate projectId
     const parsed = objectIdSchema.safeParse(projectIdParam);
     if (!parsed.success) {
-      console.log("TASK API DEBUG: Invalid projectId format:", projectIdParam, parsed.error.flatten());
       return NextResponse.json({ error: "projectId is required and must be valid" }, { status: 400 });
     }
 
@@ -243,4 +263,3 @@ export const taskController = {
     return NextResponse.json({ tasks: mappedTasks, projectId: parsed.data }, { status: 200 });
   },
 };
-

@@ -80,3 +80,46 @@ export type KanbanTask = {
 };
 
 export const KANBAN_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+
+export interface MockMember {
+  id: string;
+  name: string;
+  initials: string;
+  role: string;
+  avatarColor?: string;
+}
+
+export interface MockProjectTask {
+  id: string;
+  title: string;
+  status: "todo" | "in-progress" | "in-review" | "done";
+  priority: "low" | "medium" | "high" | "urgent";
+  assignee: MockMember;
+  dueDate: string;
+}
+
+export interface MockActivity {
+  id: string;
+  user: {
+    name: string;
+    initials: string;
+    avatarUrl?: string;
+  };
+  action: string;
+  target: string;
+  timestamp: string;
+}
+
+export interface MockProject {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  priority: "low" | "medium" | "high" | "urgent";
+  status: "planning" | "active" | "paused" | "completed";
+  dueDate: string;
+  members: MockMember[];
+  tasks: MockProjectTask[];
+  activities: MockActivity[];
+}
+

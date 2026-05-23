@@ -40,18 +40,36 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
-// Mock Data
-import {
-  mockDashboardStats,
-  mockDashboardProjects,
-  mockRecentActivities,
-  mockProductivityData,
-  type DashboardProject,
-} from "@/lib/mock/dashboard";
+// Services & Sockets
+import { useSocket } from "@/hooks/use-socket";
+import { workspaceService, projectService, activityService } from "@/services";
+import type { WorkspaceMetrics } from "@/services/workspace.service";
 
 interface DashboardOverviewProps {
   userDisplayName?: string;
   userAvatarUrl?: string;
+}
+
+const ACCENT_GRADIENTS = [
+  "from-violet-500/20 to-fuchsia-500/5",
+  "from-sky-500/20 to-cyan-500/5",
+  "from-emerald-500/20 to-teal-500/5",
+  "from-amber-500/15 to-orange-500/5",
+  "from-indigo-500/20 to-purple-500/5",
+];
+
+function formatTimeAgo(dateInput: any) {
+  if (!dateInput) return "Just now";
+  const date = new Date(dateInput);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 export function DashboardOverview({
@@ -59,8 +77,13 @@ export function DashboardOverview({
   userAvatarUrl,
 }: DashboardOverviewProps) {
   const [isLoading, setIsLoading] = useState(true);
-  const [projects, setProjects] = useState<DashboardProject[]>(mockDashboardProjects);
-  const [activities, setActivities] = useState(mockRecentActivities);
+  const [metrics, setMetrics] = useState<WorkspaceMetrics | null>(null);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+
+  const { socket } = useSocket({
+    projectId: "global",
+  });
 
   // Quick Action Dialog states
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
@@ -78,82 +101,138 @@ export function DashboardOverview({
   const [aiTyping, setAiTyping] = useState(false);
   const [aiMessages, setAiMessages] = useState<
     Array<{ sender: "user" | "ai"; text: string; timestamp: string }>
-  >([
-    {
-      sender: "ai",
-      text: `Hello ${userDisplayName}! I am your DevCollab AI assistant. Ask me anything about your active projects, tasks, or workspace velocity.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    },
-  ]);
+  >([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Initialize AI message after name is resolved
   useEffect(() => {
-    // Scroll to bottom of AI chat when messages change
+    setAiMessages([
+      {
+        sender: "ai",
+        text: `Hello ${userDisplayName}! I am your DevCollab AI assistant. Ask me anything about your active projects, tasks, or workspace velocity.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      },
+    ]);
+  }, [userDisplayName]);
+
+  useEffect(() => {
     if (isAiOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [aiMessages, isAiOpen]);
 
-  // Simulate loading state on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
+  const fetchDashboardData = async (showLoading = false) => {
+    if (showLoading) setIsLoading(true);
+    try {
+      await fetch("/api/users/me");
+
+      const [workspaceRes, projectsList, activitiesList] = await Promise.all([
+        workspaceService.getWorkspaceWithMetrics(),
+        projectService.list(),
+        activityService.list(),
+      ]);
+
+      setMetrics(workspaceRes.metrics);
+      setProjects(projectsList);
+
+      const formattedActivities = activitiesList.map((a: any) => {
+        const actionStr = a.action || "updated";
+        const type = actionStr.includes("task")
+          ? "task"
+          : actionStr.includes("project")
+          ? "project"
+          : actionStr.includes("invite") || actionStr.includes("join") || actionStr.includes("member")
+          ? "team"
+          : "system";
+
+        return {
+          id: a._id || a.id,
+          user: {
+            name: a.user?.name || "System",
+            initials: a.user?.initials || "SYS",
+            avatarUrl: a.user?.avatarUrl,
+          },
+          action: actionStr,
+          target: a.target || "",
+          projectName: a.projectId ? "Project" : undefined,
+          timestamp: formatTimeAgo(a.timestamp || a.createdAt),
+          type,
+        };
+      });
+      setActivities(formattedActivities);
+    } catch (err) {
+      console.error("Failed to load dashboard data:", err);
+    } finally {
       setIsLoading(false);
-    }, 650);
-    return () => clearTimeout(timer);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData(true);
   }, []);
 
-  const handleCreateProject = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!socket) return;
+
+    const onProjectCreated = (newProject: any) => {
+      console.log("[Dashboard] Socket: projectCreated received", newProject);
+      fetchDashboardData();
+    };
+
+    const onProjectUpdated = (updatedProject: any) => {
+      console.log("[Dashboard] Socket: projectUpdated received", updatedProject);
+      fetchDashboardData();
+    };
+
+    const onActivityCreated = (newActivity: any) => {
+      console.log("[Dashboard] Socket: activityCreated received", newActivity);
+      fetchDashboardData();
+    };
+
+    socket.on("projectCreated", onProjectCreated);
+    socket.on("projectUpdated", onProjectUpdated);
+    socket.on("activityCreated", onActivityCreated);
+
+    return () => {
+      socket.off("projectCreated", onProjectCreated);
+      socket.off("projectUpdated", onProjectUpdated);
+      socket.off("activityCreated", onActivityCreated);
+    };
+  }, [socket]);
+
+  const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProjectName.trim()) return;
 
-    const newProject: DashboardProject = {
-      id: `p-${Date.now()}`,
-      title: newProjectName,
-      description: newProjectDesc || "Collaborative workspace project.",
-      progress: 0,
-      status: "active",
-      deadline: "August 30, 2026",
-      accentColor: "from-indigo-500/20 to-purple-500/5",
-      members: [{ id: "m-user", name: userDisplayName, initials: userDisplayName.slice(0, 2).toUpperCase() }],
-    };
+    try {
+      await projectService.create({
+        title: newProjectName,
+        description: newProjectDesc || "Collaborative workspace project.",
+        status: "active",
+        user: { name: userDisplayName, initials: userDisplayName.slice(0, 2).toUpperCase() },
+      });
 
-    setProjects((prev) => [newProject, ...prev]);
-
-    // Add activity log
-    const newActivity = {
-      id: `a-${Date.now()}`,
-      user: { name: userDisplayName, initials: userDisplayName.slice(0, 2).toUpperCase() },
-      action: "created project",
-      target: newProjectName,
-      timestamp: "Just now",
-      type: "project" as const,
-    };
-    setActivities((prev) => [newActivity, ...prev]);
-
-    // Reset and close
-    setNewProjectName("");
-    setNewProjectDesc("");
-    setIsNewProjectOpen(false);
+      setNewProjectName("");
+      setNewProjectDesc("");
+      setIsNewProjectOpen(false);
+    } catch (err) {
+      console.error("Failed to create project:", err);
+    }
   };
 
-  const handleInviteUser = (e: React.FormEvent) => {
+  const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
 
-    // Add activity log
-    const newActivity = {
-      id: `a-${Date.now()}`,
-      user: { name: userDisplayName, initials: userDisplayName.slice(0, 2).toUpperCase() },
-      action: `invited ${inviteRole}`,
-      target: inviteEmail,
-      timestamp: "Just now",
-      type: "team" as const,
-    };
-    setActivities((prev) => [newActivity, ...prev]);
-
-    setInviteEmail("");
-    setIsInviteOpen(false);
+    try {
+      await workspaceService.inviteMember(inviteEmail, inviteRole);
+      setInviteEmail("");
+      setIsInviteOpen(false);
+      fetchDashboardData();
+    } catch (err) {
+      console.error("Failed to invite user:", err);
+    }
   };
 
   const handleSendAiMessage = (e?: React.FormEvent) => {
@@ -174,15 +253,19 @@ export function DashboardOverview({
 
     setTimeout(() => {
       setAiTyping(false);
-      let reply = `I'm analyzing your DevCollab workspaces. You currently have ${projects.length} active projects and 28 pending tasks. Everything looks healthy!`;
+      let reply = `I'm analyzing your DevCollab workspaces. You currently have ${projects.length} active projects and ${metrics?.pendingTasks ?? 0} pending tasks. ${metrics?.overdueTasks && metrics.overdueTasks > 0 ? `You have ${metrics.overdueTasks} overdue tasks that need attention.` : "Everything looks healthy!"}`;
 
       const lower = text.toLowerCase();
       if (lower.includes("due") || lower.includes("deadline") || lower.includes("task")) {
-        reply = "Looking at your boards, you have 3 tasks due soon: 'Design onboarding flow' is due tomorrow (High Priority), 'Implement OAuth refresh' is due today (Urgent), and 'QA billing edge cases' is due in 2 days.";
+        reply = `Looking at your boards, you have ${metrics?.pendingTasks ?? 0} pending tasks. ${metrics?.overdueTasks && metrics.overdueTasks > 0 ? `Specifically, ${metrics.overdueTasks} tasks are currently overdue and require your immediate attention.` : "No tasks are currently overdue."}`;
       } else if (lower.includes("project") || lower.includes("active")) {
-        reply = `Here is a summary of active projects: \n\n1. *${projects[0].title}* - ${projects[0].progress}% complete (${projects[0].status})\n2. *${projects[1].title}* - ${projects[1].progress}% complete (${projects[1].status})`;
+        reply = `Here is a summary of active projects: \n\n${
+          projects.length > 0
+            ? projects.map((p, i) => `${i + 1}. *${p.title || p.name}* - ${p.progress}% complete (${p.status})`).join("\n")
+            : "No active projects found."
+        }`;
       } else if (lower.includes("velocity") || lower.includes("chart") || lower.includes("productivity")) {
-        reply = "According to our velocity charts, task completion peaked on Friday at 24 completed tasks. Overall team velocity has increased by 18% compared to last week.";
+        reply = `According to our velocity charts, you have completed ${metrics?.tasksCompleted ?? 0} tasks overall in this workspace. Team velocity has synced directly with MongoDB databases in real time.`;
       }
 
       setAiMessages((prev) => [
@@ -200,6 +283,41 @@ export function DashboardOverview({
     setAiInput(suggestion);
   };
 
+  const stats = [
+    {
+      label: "Active Projects",
+      value: String(metrics?.activeProjects ?? 0),
+      change: "In progress",
+      trend: "stable" as const,
+      iconName: "folder-kanban" as const,
+      colorClass: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
+    },
+    {
+      label: "Tasks Completed",
+      value: String(metrics?.tasksCompleted ?? 0),
+      change: "Completed items",
+      trend: "stable" as const,
+      iconName: "check-circle" as const,
+      colorClass: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    },
+    {
+      label: "Pending Tasks",
+      value: String(metrics?.pendingTasks ?? 0),
+      change: "Active backlog",
+      trend: "stable" as const,
+      iconName: "clock" as const,
+      colorClass: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    },
+    {
+      label: "Overdue Tasks",
+      value: String(metrics?.overdueTasks ?? 0),
+      change: metrics?.overdueTasks && metrics.overdueTasks > 0 ? "Requires action" : "All clean",
+      trend: (metrics?.overdueTasks && metrics.overdueTasks > 0 ? "down" : "stable") as "up" | "down" | "stable",
+      iconName: "alert-circle" as const,
+      colorClass: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+    },
+  ];
+
   return (
     <div className="space-y-8">
       {/* Header and Welcome */}
@@ -210,7 +328,7 @@ export function DashboardOverview({
             <Sparkle className="h-5 w-5 text-indigo-400 fill-indigo-400 animate-pulse" />
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Hi, <span className="font-semibold text-foreground">{userDisplayName}</span>. Welcome back to your workspace workspace.
+            Hi, <span className="font-semibold text-foreground">{userDisplayName}</span>. Welcome back to your workspace.
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border/30 w-fit">
@@ -223,20 +341,34 @@ export function DashboardOverview({
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {isLoading
           ? Array.from({ length: 4 }).map((_, i) => <DashboardStatCardSkeleton key={i} />)
-          : mockDashboardStats.map((stat) => (
+          : stats.map((stat) => (
               <DashboardStatCard key={stat.label} {...stat} />
             ))}
       </section>
 
       {/* Two Column Layout */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left 2 Columns: Chart and Projects */}
         <div className="lg:col-span-2 space-y-6">
           {/* Productivity Chart */}
           {isLoading ? (
             <ProductivityChartSkeleton />
           ) : (
-            <ProductivityChart data={mockProductivityData} />
+            <ProductivityChart
+              data={
+                metrics?.velocity && metrics.velocity.length > 0
+                  ? metrics.velocity
+                  : Array.from({ length: 7 }, (_, i) => {
+                      const d = new Date();
+                      d.setDate(new Date().getDate() - (6 - i));
+                      const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                      return {
+                        name: daysOfWeek[d.getDay()],
+                        completed: 0,
+                        created: 0,
+                      };
+                    })
+              }
+            />
           )}
 
           {/* Projects Section */}
@@ -259,19 +391,56 @@ export function DashboardOverview({
               </Link>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {isLoading
-                ? Array.from({ length: 4 }).map((_, i) => <ProjectOverviewCardSkeleton key={i} />)
-                : projects.map((project) => (
-                    <ProjectOverviewCard key={project.id} {...project} />
-                  ))}
-            </div>
+            {isLoading ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => <ProjectOverviewCardSkeleton key={i} />)}
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8 text-center space-y-4 border border-dashed border-border/40 rounded-xl bg-card/5">
+                <FolderKanban className="h-8 w-8 text-muted-foreground opacity-60 animate-pulse" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">No projects created yet</p>
+                  <p className="text-xs text-muted-foreground">
+                    Get started by creating your first collaborative project.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsNewProjectOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-600/10 hover:bg-indigo-500 hover:shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  Create Project
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {projects.map((project, idx) => {
+                  const mappedProj = {
+                    id: project._id || project.id,
+                    title: project.title || project.name || "Untitled Project",
+                    description: project.description || "Collaborative dev workspace project.",
+                    progress: project.progress || 0,
+                    status: project.status || "active",
+                    deadline: project.dueDate ? new Date(project.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "No deadline",
+                    accentColor: project.accentColor || ACCENT_GRADIENTS[idx % ACCENT_GRADIENTS.length],
+                    members: (project.members || []).map((m: any) => ({
+                      id: m._id || m.id,
+                      name: m.name || "Member",
+                      initials: m.initials || "M",
+                      avatarUrl: m.avatarUrl
+                    }))
+                  };
+                  return (
+                    <ProjectOverviewCard key={mappedProj.id} {...mappedProj} />
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right 1 Column: Quick Actions & Activity Feed */}
         <div className="space-y-6">
-          {/* Quick Actions Card */}
           <div className="rounded-xl border border-border/50 bg-card/30 p-5 space-y-4">
             <h3 className="font-semibold text-foreground text-sm uppercase tracking-wider">
               Quick Actions
@@ -314,7 +483,6 @@ export function DashboardOverview({
             </div>
           </div>
 
-          {/* Recent Activity Card */}
           <div className="rounded-xl border border-border/50 bg-card/30 p-5 space-y-4">
             <div>
               <h3 className="font-semibold text-foreground text-sm uppercase tracking-wider">
@@ -447,7 +615,7 @@ export function DashboardOverview({
 
       {/* AI Assistant Dialog */}
       <Dialog open={isAiOpen} onOpenChange={setIsAiOpen}>
-        <DialogContent className="sm:max-w-120 p-0 overflow-hidden flex flex-col h-130">
+        <DialogContent className="sm:max-w-120 p-0 overflow-hidden flex flex-col h-130 bg-zinc-950 border border-border/60">
           <div className="p-4 border-b border-border/50 bg-secondary/20 flex items-center gap-2 shrink-0">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
               <Bot className="h-4 w-4" />
@@ -462,7 +630,6 @@ export function DashboardOverview({
             </div>
           </div>
 
-          {/* Message Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-card/20">
             {aiMessages.map((msg, idx) => (
               <div
@@ -521,7 +688,6 @@ export function DashboardOverview({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggestions */}
           {aiMessages.length === 1 && !aiTyping && (
             <div className="p-3 bg-secondary/10 border-t border-border/30 shrink-0 space-y-1.5">
               <p className="text-[10px] font-semibold text-muted-foreground">Try asking:</p>
@@ -548,7 +714,6 @@ export function DashboardOverview({
             </div>
           )}
 
-          {/* Chat Input */}
           <form
             onSubmit={handleSendAiMessage}
             className="p-3 border-t border-border/40 bg-card flex gap-2 items-center shrink-0"

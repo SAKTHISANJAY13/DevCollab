@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { mockMembers, type MockProject } from "@/lib/mock/projects";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: (open: boolean) => void;
-  onCreateProject: (project: MockProject) => void;
+  onCreateProject: (project: any) => void;
+  members: any[];
 }
 
-export function CreateProjectModal({ isOpen, onClose, onCreateProject }: CreateProjectModalProps) {
+export function CreateProjectModal({ isOpen, onClose, onCreateProject, members }: CreateProjectModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
@@ -29,28 +29,17 @@ export function CreateProjectModal({ isOpen, onClose, onCreateProject }: CreateP
     if (!title.trim() || !dueDate) return;
 
     // Resolve selected member objects
-    const projectMembers = mockMembers.filter((m) => selectedMemberIds.includes(m.id));
+    const projectMembers = members.filter((m) => selectedMemberIds.includes(m.id));
 
-    // Construct project
-    const newProject: MockProject = {
-      id: `p-${Date.now()}`,
+    // Construct project input payload
+    const newProject = {
       title,
       description: description || "Collaborative dev workspace project.",
       progress: status === "completed" ? 100 : 0,
       priority,
       status,
       dueDate,
-      members: projectMembers.length > 0 ? projectMembers : [mockMembers[0]], // Default to first member if none chosen
-      tasks: [],
-      activities: [
-        {
-          id: `a-${Date.now()}`,
-          user: { name: "System", initials: "SYS" },
-          action: "created workspace",
-          target: title,
-          timestamp: "Just now",
-        },
-      ],
+      members: projectMembers,
     };
 
     onCreateProject(newProject);
@@ -117,7 +106,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreateProject }: CreateP
                 id="proj-status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as "planning" | "active" | "paused" | "completed")}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
               >
                 <option value="planning">Planning</option>
                 <option value="active">Active</option>
@@ -135,7 +124,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreateProject }: CreateP
                 id="proj-priority"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as "low" | "medium" | "high" | "urgent")}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -166,7 +155,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreateProject }: CreateP
               Collaborators (Select all that apply)
             </span>
             <div className="grid grid-cols-2 gap-2 bg-background/50 border border-border/60 p-3 rounded-lg max-h-32 overflow-y-auto">
-              {mockMembers.map((m) => (
+              {members.map((m) => (
                 <button
                   key={m.id}
                   type="button"
@@ -177,7 +166,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreateProject }: CreateP
                       : "border-transparent hover:bg-muted text-muted-foreground"
                   }`}
                 >
-                  <span className={`h-4 w-4 rounded-full flex items-center justify-center text-[8px] font-bold ${m.avatarColor}`}>
+                  <span className="h-4 w-4 rounded-full flex items-center justify-center text-[8px] font-bold bg-indigo-600 text-indigo-100">
                     {m.initials}
                   </span>
                   <span className="truncate">{m.name}</span>

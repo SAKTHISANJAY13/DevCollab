@@ -12,7 +12,12 @@ import {
   Legend,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import type { ProductivityDataPoint } from "@/lib/mock/dashboard";
+
+export interface ProductivityDataPoint {
+  name: string;
+  completed: number;
+  created: number;
+}
 
 interface ProductivityChartProps {
   data: ProductivityDataPoint[];

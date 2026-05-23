@@ -1,4 +1,4 @@
-import { Schema, model, models, type InferSchemaType, type Types } from "mongoose";
+import { Schema, model, models, type InferSchemaType } from "mongoose";
 
 export const WORKSPACE_ROLES = ["owner", "admin", "member"] as const;
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
@@ -7,6 +7,7 @@ const WorkspaceMemberSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     role: { type: String, enum: WORKSPACE_ROLES, required: true, default: "member" },
+    joinedAt: { type: Date, default: Date.now },
   },
   { _id: false },
 );
@@ -23,8 +24,9 @@ export const WorkspaceSchema = new Schema(
 );
 
 export type WorkspaceMember = {
-  userId: Types.ObjectId;
+  userId: any;
   role: WorkspaceRole;
+  joinedAt?: Date;
 };
 
 export type WorkspaceDoc = InferSchemaType<typeof WorkspaceSchema> & {

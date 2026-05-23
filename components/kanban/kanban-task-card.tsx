@@ -21,7 +21,15 @@ const PRIORITY_LABEL: Record<KanbanPriority, string> = {
   urgent: "Urgent",
 };
 
-export function KanbanTaskCard({ task, isOverlay }: { task: KanbanTask; isOverlay?: boolean }) {
+export function KanbanTaskCard({
+  task,
+  isOverlay,
+  onClick,
+}: {
+  task: KanbanTask;
+  isOverlay?: boolean;
+  onClick?: () => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -43,18 +51,28 @@ export function KanbanTaskCard({ task, isOverlay }: { task: KanbanTask; isOverla
       {...attributes}
       {...listeners}
     >
-      <TaskCardFace task={task} />
+      <TaskCardFace task={task} onClick={onClick} />
     </div>
   );
 }
 
-function TaskCardFace({ task }: { task: KanbanTask }) {
-  const due = new Date(task.dueDate);
-  const dueLabel = due.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function TaskCardFace({ task, onClick }: { task: KanbanTask; onClick?: () => void }) {
+  const due = task.dueDate ? new Date(task.dueDate) : null;
+  const dueLabel = due ? due.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
 
   return (
-    <article className="cursor-grab rounded-lg border border-border/60 bg-card/90 p-3 shadow-sm ring-1 ring-border/40 active:cursor-grabbing">
-      <h3 className="text-left text-[13px] font-medium leading-snug text-foreground">{task.title}</h3>
+    <article
+      onClick={(e) => {
+        // Prevent click if dragging
+        if (onClick) {
+          onClick();
+        }
+      }}
+      className="cursor-pointer rounded-lg border border-border/60 bg-card/90 p-3 shadow-sm ring-1 ring-border/40 hover:border-indigo-500/40 hover:shadow-md transition-all active:cursor-grabbing text-left"
+    >
+      <h3 className="text-left text-[13px] font-medium leading-snug text-foreground group-hover:text-indigo-400 transition-colors">
+        {task.title}
+      </h3>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span
@@ -67,13 +85,15 @@ function TaskCardFace({ task }: { task: KanbanTask }) {
         </span>
 
         <div className="ml-auto flex items-center gap-2">
-          <time
-            className="inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground"
-            dateTime={task.dueDate}
-          >
-            <Calendar className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-            {dueLabel}
-          </time>
+          {dueLabel && (
+            <time
+              className="inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground"
+              dateTime={task.dueDate}
+            >
+              <Calendar className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+              {dueLabel}
+            </time>
+          )}
           <span
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-[10px] font-semibold text-primary-foreground ring-1 ring-border/60"
             title={task.assignee.name}

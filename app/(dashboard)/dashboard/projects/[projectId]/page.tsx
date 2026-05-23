@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -14,11 +14,16 @@ import {
   Calendar,
   Check,
   Briefcase,
+  Loader2,
+  Trash2,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockProjects, mockMembers, type MockProject, type MockProjectTask } from "@/lib/mock/projects";
 import { ProjectOverviewPanel } from "@/components/projects/project-overview-panel";
 import { ProjectActivityFeed } from "@/components/projects/project-activity-feed";
+import { projectService, userService } from "@/services";
+import { useSocket } from "@/hooks/use-socket";
+import { apiClient } from "@/lib/api-client";
 
 type TabType = "overview" | "tasks" | "team" | "activity";
 
@@ -26,7 +31,9 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params?.projectId as string;
 
-  const [project, setProject] = useState<MockProject | null>(null);
+  const [project, setProject] = useState<any>(null);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
@@ -37,15 +44,107 @@ export default function ProjectDetailPage() {
   // Team invite state
   const [selectedInviteMemberId, setSelectedInviteMemberId] = useState("");
 
-  // Load project on mount/id change
+  // Delete project state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const router = useRouter();
+
+  const handleDeleteProject = async () => {
+    if (!project) return;
+    if (deleteConfirmText !== project.title) {
+      alert("Project title confirmation does not match.");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await projectService.delete(project.id);
+      router.push("/dashboard/projects");
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      alert("Failed to delete project. Please try again.");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const { socket } = useSocket({ projectId });
+
+  const fetchProjectDetails = async (showLoading = false) => {
+    if (showLoading) setIsLoading(true);
+    try {
+      const data = await projectService.getById(projectId);
+      setProject(data);
+    } catch (err) {
+      console.error("Failed to load project details:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const users = await userService.list();
+      setAllUsers(users || []);
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+    }
+  };
+
+  // Load project and users on mount/id change
   useEffect(() => {
     if (projectId) {
-      const found = mockProjects.find((p) => p.id === projectId);
-      if (found) {
-        setProject(JSON.parse(JSON.stringify(found))); // deep clone to avoid modifying default static mock directly
-      }
+      fetchProjectDetails(true);
+      fetchUsers();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  // Handle socket.io realtime events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleTaskEvent = () => {
+      console.log("[Project Detail] Socket task event received, refreshing project details...");
+      fetchProjectDetails();
+    };
+
+    const handleProjectUpdated = (updatedProj: any) => {
+      console.log("[Project Detail] Socket projectUpdated received:", updatedProj);
+      const updatedId = updatedProj.id || updatedProj._id;
+      if (updatedId === projectId) {
+        fetchProjectDetails();
+      }
+    };
+
+    socket.on("taskCreated", handleTaskEvent);
+    socket.on("taskUpdated", handleTaskEvent);
+    socket.on("taskMoved", handleTaskEvent);
+    socket.on("taskDeleted", handleTaskEvent);
+    socket.on("projectUpdated", handleProjectUpdated);
+
+    return () => {
+      socket.off("taskCreated", handleTaskEvent);
+      socket.off("taskUpdated", handleTaskEvent);
+      socket.off("taskMoved", handleTaskEvent);
+      socket.off("taskDeleted", handleTaskEvent);
+      socket.off("projectUpdated", handleProjectUpdated);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, projectId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+        <p className="text-sm text-muted-foreground">Loading project details...</p>
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -60,121 +159,103 @@ export default function ProjectDetailPage() {
   }
 
   // Calculate stats
-  const completedTasksCount = project.tasks.filter((t) => t.status === "done").length;
-  const totalTasksCount = project.tasks.length;
+  const completedTasksCount = (project.tasks || []).filter((t: any) => t.status === "done").length;
+  const totalTasksCount = (project.tasks || []).length;
 
   // Toggle task status (Done <-> Todo)
-  const handleToggleTask = (taskId: string) => {
+  const handleToggleTask = async (taskId: string) => {
     if (!project) return;
+    const task = project.tasks.find((t: any) => t.id === taskId);
+    if (!task) return;
 
-    const updatedTasks = project.tasks.map((task) => {
-      if (task.id === taskId) {
-        const newStatus = task.status === "done" ? "todo" as const : "done" as const;
-        
-        // Log activity for completion
-        const actionStr = newStatus === "done" ? "completed task" : "marked task as incomplete";
-        const newAct = {
-          id: `a-${Date.now()}`,
-          user: { name: "You", initials: "ME" },
-          action: actionStr,
-          target: task.title,
-          timestamp: "Just now",
+    const newStatus = task.status === "done" ? "todo" : "done";
+
+    try {
+      // Optimistic update
+      setProject((prev: any) => {
+        if (!prev) return null;
+        const updatedTasks = prev.tasks.map((t: any) =>
+          t.id === taskId ? { ...t, status: newStatus as "todo" | "done" } : t
+        );
+        const total = updatedTasks.length;
+        const completed = updatedTasks.filter((t: any) => t.status === "done").length;
+        const newProgress = total > 0 ? Math.round((completed / total) * 100) : 0;
+        return {
+          ...prev,
+          tasks: updatedTasks,
+          progress: newProgress,
         };
-        project.activities.unshift(newAct);
+      });
 
-        return { ...task, status: newStatus };
-      }
-      return task;
-    });
-
-    // Recalculate progress
-    const total = updatedTasks.length;
-    const completed = updatedTasks.filter((t) => t.status === "done").length;
-    const newProgress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-    setProject({
-      ...project,
-      tasks: updatedTasks,
-      progress: newProgress,
-    });
+      // Call API
+      await apiClient(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        body: { status: newStatus },
+      });
+    } catch (err) {
+      console.error("Failed to toggle task status:", err);
+      fetchProjectDetails();
+    }
   };
 
   // Add task handler
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskTitle.trim() || !newTaskDueDate) return;
+    if (!newTaskTitle.trim() || !newTaskDueDate || !project) return;
 
-    const assignee = project.members.find((m) => m.id === newTaskAssigneeId) || project.members[0];
+    try {
+      const assigneeId = newTaskAssigneeId || undefined;
+      
+      await apiClient<{ task: any }>("/api/tasks", {
+        method: "POST",
+        body: {
+          workspaceId: project.workspaceId || "65b1cd78385ff29402517e5a",
+          projectId: project.id,
+          title: newTaskTitle,
+          status: "todo",
+          priority: newTaskPriority,
+          assigneeId,
+          dueDate: newTaskDueDate,
+        },
+      });
 
-    const newTask: MockProjectTask = {
-      id: `task-${Date.now()}`,
-      title: newTaskTitle,
-      status: "todo",
-      priority: newTaskPriority,
-      assignee,
-      dueDate: newTaskDueDate,
-    };
-
-    const updatedTasks = [...project.tasks, newTask];
-    const total = updatedTasks.length;
-    const completed = updatedTasks.filter((t) => t.status === "done").length;
-    const newProgress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-    // Log activity
-    const newAct = {
-      id: `a-${Date.now()}`,
-      user: { name: "You", initials: "ME" },
-      action: "created task",
-      target: newTaskTitle,
-      timestamp: "Just now",
-    };
-
-    setProject({
-      ...project,
-      tasks: updatedTasks,
-      progress: newProgress,
-      activities: [newAct, ...project.activities],
-    });
-
-    // Reset inputs
-    setNewTaskTitle("");
-    setNewTaskPriority("medium");
-    setNewTaskDueDate("");
-    setShowAddTask(false);
+      // Reset inputs
+      setNewTaskTitle("");
+      setNewTaskPriority("medium");
+      setNewTaskDueDate("");
+      setNewTaskAssigneeId("");
+      setShowAddTask(false);
+      
+      fetchProjectDetails();
+    } catch (err) {
+      console.error("Failed to add task:", err);
+    }
   };
 
   // Invite member handler
-  const handleInviteMember = (e: React.FormEvent) => {
+  const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedInviteMemberId) return;
-
-    const memberToInvite = mockMembers.find((m) => m.id === selectedInviteMemberId);
-    if (!memberToInvite) return;
+    if (!selectedInviteMemberId || !project) return;
 
     // Check if already in project
-    if (project.members.some((m) => m.id === memberToInvite.id)) {
+    if (project.members.some((m: any) => m.id === selectedInviteMemberId)) {
       alert("Collaborator is already a team member of this project.");
       return;
     }
 
-    const updatedMembers = [...project.members, memberToInvite];
-    
-    // Log activity
-    const newAct = {
-      id: `a-${Date.now()}`,
-      user: { name: "You", initials: "ME" },
-      action: "added collaborator",
-      target: memberToInvite.name,
-      timestamp: "Just now",
-    };
+    const currentMemberIds = project.members.map((m: any) => m.id);
+    const updatedMembers = [...currentMemberIds, selectedInviteMemberId];
 
-    setProject({
-      ...project,
-      members: updatedMembers,
-      activities: [newAct, ...project.activities],
-    });
+    try {
+      await projectService.update(project.id, {
+        members: updatedMembers,
+      });
 
-    setSelectedInviteMemberId("");
+      setSelectedInviteMemberId("");
+      fetchProjectDetails();
+    } catch (err) {
+      console.error("Failed to add member to project:", err);
+    }
   };
 
   // Priority badge coloring helper
@@ -209,55 +290,65 @@ export default function ProjectDetailPage() {
           </p>
         </div>
 
-        {/* Tab navigation */}
-        <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border border-border/30 overflow-x-auto w-fit">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Tab navigation */}
+          <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border border-border/30 overflow-x-auto w-fit">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap",
+                activeTab === "overview"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("tasks")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap",
+                activeTab === "tasks"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              Tasks ({totalTasksCount})
+            </button>
+            <button
+              onClick={() => setActiveTab("team")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap",
+                activeTab === "team"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Team ({(project.members || []).length})
+            </button>
+            <button
+              onClick={() => setActiveTab("activity")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap",
+                activeTab === "activity"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <History className="h-3.5 w-3.5" />
+              Activity
+            </button>
+          </div>
+
           <button
-            onClick={() => setActiveTab("overview")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap",
-              activeTab === "overview"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
+            onClick={() => setShowDeleteModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600/10 border border-rose-500/20 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
           >
-            <LayoutDashboard className="h-3.5 w-3.5" />
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab("tasks")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap",
-              activeTab === "tasks"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <CheckSquare className="h-3.5 w-3.5" />
-            Tasks ({totalTasksCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("team")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap",
-              activeTab === "team"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Users className="h-3.5 w-3.5" />
-            Team ({project.members.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("activity")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer whitespace-nowrap",
-              activeTab === "activity"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <History className="h-3.5 w-3.5" />
-            Activity
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete Project
           </button>
         </div>
       </div>
@@ -317,7 +408,7 @@ export default function ProjectDetailPage() {
                       className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none"
                     >
                       <option value="">Select Assignee</option>
-                      {project.members.map((m) => (
+                      {(project.members || []).map((m: any) => (
                         <option key={m.id} value={m.id}>{m.name}</option>
                       ))}
                     </select>
@@ -371,10 +462,11 @@ export default function ProjectDetailPage() {
             )}
 
             {/* Task list render */}
-            {project.tasks.length > 0 ? (
+            {(project.tasks || []).length > 0 ? (
               <div className="rounded-xl border border-border/40 bg-card/10 overflow-hidden divide-y divide-border/20">
-                {project.tasks.map((task) => {
+                {(project.tasks || []).map((task: any) => {
                   const isDone = task.status === "done";
+                  const assignee = task.assignee || { id: "unassigned", name: "Unassigned", initials: "U", role: "Unassigned", avatarColor: "bg-muted text-muted-foreground" };
                   return (
                     <div
                       key={task.id}
@@ -404,22 +496,27 @@ export default function ProjectDetailPage() {
                       {/* Right side details */}
                       <div className="flex items-center gap-3 shrink-0">
                         {/* Priority */}
-                        <span className={cn("text-[9px] font-bold border px-1.5 py-0.5 rounded-full uppercase tracking-wider", taskPriorityStyles[task.priority])}>
+                        <span className={cn("text-[9px] font-bold border px-1.5 py-0.5 rounded-full uppercase tracking-wider", taskPriorityStyles[task.priority as keyof typeof taskPriorityStyles] || taskPriorityStyles.medium)}>
                           {task.priority}
                         </span>
 
                         {/* Assignee */}
                         <div
-                          title={`${task.assignee.name} - ${task.assignee.role}`}
-                          className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold border border-border/30 cursor-pointer", task.assignee.avatarColor)}
+                          title={`${assignee.name} - ${assignee.role}`}
+                          className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold border border-border/30 cursor-pointer", assignee.avatarColor || "bg-indigo-500 text-indigo-100")}
                         >
-                          {task.assignee.initials}
+                          {assignee.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={assignee.avatarUrl} alt={assignee.name} className="h-full w-full rounded-full object-cover" />
+                          ) : (
+                            assignee.initials
+                          )}
                         </div>
 
                         {/* Due date */}
                         <span className="text-[10px] text-muted-foreground font-mono hidden sm:inline-flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          {task.dueDate ? new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "No due date"}
                         </span>
                       </div>
                     </div>
@@ -456,10 +553,10 @@ export default function ProjectDetailPage() {
                   required
                 >
                   <option value="">Choose Developer</option>
-                  {mockMembers
-                    .filter((m) => !project.members.some((pm) => pm.id === m.id))
-                    .map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
+                  {allUsers
+                    .filter((u) => !project.members.some((pm: any) => pm.id === u._id || pm.id === u.id))
+                    .map((u) => (
+                      <option key={u._id || u.id} value={u._id || u.id}>{u.name}</option>
                     ))}
                 </select>
                 <button
@@ -474,22 +571,33 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Team Grid */}
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {project.members.map((member) => (
-                <div key={member.id} className="rounded-xl border border-border/40 bg-card/25 p-4 flex items-center gap-3">
-                  <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-sm border border-border/10", member.avatarColor)}>
-                    {member.initials}
+            {(project.members || []).length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {(project.members || []).map((member: any) => (
+                  <div key={member.id} className="rounded-xl border border-border/40 bg-card/25 p-4 flex items-center gap-3">
+                    <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-sm border border-border/10 overflow-hidden", member.avatarColor || "bg-indigo-500 text-indigo-100")}>
+                      {member.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                      ) : (
+                        member.initials
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-foreground text-sm truncate">{member.name}</h4>
+                      <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                        <Briefcase className="h-3 w-3 text-indigo-400" />
+                        {member.role || "Developer"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h4 className="font-bold text-foreground text-sm truncate">{member.name}</h4>
-                    <p className="text-[10px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
-                      <Briefcase className="h-3 w-3 text-indigo-400" />
-                      {member.role}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 rounded-xl border border-border/30 bg-card/10">
+                <p className="text-xs text-muted-foreground">No collaborators assigned to this project yet.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -505,10 +613,62 @@ export default function ProjectDetailPage() {
               </p>
             </div>
 
-            <ProjectActivityFeed activities={project.activities} />
+            <ProjectActivityFeed activities={project.activities || []} />
           </div>
         )}
       </div>
+
+      {/* Project Delete Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl border border-rose-500/30 bg-zinc-950 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-2 text-rose-400">
+              <ShieldAlert className="h-5 w-5 shrink-0" />
+              <h3 className="font-bold text-md text-foreground">Delete Project?</h3>
+            </div>
+            
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              This will permanently delete the project <span className="font-bold text-foreground">&quot;{project.title}&quot;</span> 
+              and all of its associated tasks and activities. This action is irreversible.
+            </p>
+
+            <div className="space-y-2 bg-rose-500/5 p-3 rounded-lg border border-rose-500/10">
+              <p className="text-[11px] text-muted-foreground font-semibold">
+                Please type <span className="text-foreground font-mono select-all">&quot;{project.title}&quot;</span> to confirm:
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder={project.title}
+                className="w-full rounded-lg border border-rose-500/30 bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmText("");
+                }}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-zinc-800 text-muted-foreground hover:bg-zinc-700 hover:text-foreground transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteConfirmText !== project.title || isDeleting}
+                onClick={handleDeleteProject}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isDeleting && <Loader2 className="h-3 w-3 animate-spin" />}
+                Yes, delete project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

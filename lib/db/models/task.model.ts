@@ -6,6 +6,14 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
 
+const CommentSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    content: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
 export const TaskSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -18,7 +26,9 @@ export const TaskSchema = new Schema(
     priority: { type: String, enum: TASK_PRIORITIES, default: "medium", index: true },
 
     assigneeId: { type: Schema.Types.ObjectId, ref: "User", index: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     dueDate: { type: Date, index: true },
+    comments: { type: [CommentSchema], default: [] },
   },
   { timestamps: true },
 );

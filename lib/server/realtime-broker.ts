@@ -30,9 +30,14 @@ class RealtimeBroker {
             const { projectId, event, payload } = JSON.parse(message) as RealtimeMessage;
             const io = getIO();
             if (io) {
-              const room = `project:${projectId}`;
-              io.to(room).emit(event, payload);
-              console.log(`[RealtimeBroker] Distributed event "${event}" to room "${room}"`);
+              if (projectId === "global") {
+                io.emit(event, payload);
+                console.log(`[RealtimeBroker] Distributed global event "${event}"`);
+              } else {
+                const room = `project:${projectId}`;
+                io.to(room).emit(event, payload);
+                console.log(`[RealtimeBroker] Distributed event "${event}" to room "${room}"`);
+              }
             }
           } catch (err) {
             console.error("[RealtimeBroker] Failed to parse Redis message:", err);
@@ -75,9 +80,14 @@ class RealtimeBroker {
   private localEmit(projectId: string, event: string, payload: unknown) {
     const io = getIO();
     if (io) {
-      const room = `project:${projectId}`;
-      io.to(room).emit(event, payload);
-      console.log(`[RealtimeBroker] Emitted event "${event}" locally to room "${room}"`);
+      if (projectId === "global") {
+        io.emit(event, payload);
+        console.log(`[RealtimeBroker] Emitted global event "${event}" locally`);
+      } else {
+        const room = `project:${projectId}`;
+        io.to(room).emit(event, payload);
+        console.log(`[RealtimeBroker] Emitted event "${event}" locally to room "${room}"`);
+      }
     } else {
       console.warn(`[RealtimeBroker] Cannot emit "${event}" - Socket.IO server is not initialized yet.`);
     }

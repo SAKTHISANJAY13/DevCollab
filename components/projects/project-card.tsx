@@ -3,10 +3,26 @@
 import Link from "next/link";
 import { Calendar, CircleDot, PlayCircle, CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MockProject } from "@/lib/mock/projects";
+
+export interface ProjectItem {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  priority: "low" | "medium" | "high" | "urgent";
+  status: "planning" | "active" | "paused" | "completed" | "archived";
+  dueDate: string;
+  members: Array<{
+    id: string;
+    name: string;
+    initials: string;
+    role: string;
+    avatarColor?: string;
+  }>;
+}
 
 interface ProjectCardProps {
-  project: MockProject;
+  project: ProjectItem;
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
@@ -18,6 +34,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
     active: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
     paused: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    archived: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
   };
 
   const statusIcons = {
@@ -25,6 +42,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
     active: <CircleDot className="h-3 w-3 animate-pulse" />,
     paused: <PlayCircle className="h-3 w-3" />,
     completed: <CheckCircle2 className="h-3 w-3" />,
+    archived: <Circle className="h-3 w-3 opacity-60" />,
   };
 
   // Priority mapping

@@ -1,46 +1,7 @@
 import mongoose from "mongoose";
-
-import { connectMongoose, isMockMode } from "@/lib/db/mongoose";
+import { connectMongoose } from "@/lib/db/mongoose";
 import { TaskModel, type TaskStatus, type TaskPriority } from "@/lib/db/models";
-
-export interface MockTask {
-  _id: string;
-  projectId: string;
-  workspaceId?: string;
-  title: string;
-  description?: string;
-  status: string;
-  priority?: string;
-  assigneeId?: { _id: string; name: string; avatarUrl?: string };
-  dueDate?: Date | string;
-}
-
-const mockTasks: MockTask[] = [
-  {
-    _id: "1",
-    projectId: "000000000000000000000000",
-    title: "Setup authentication",
-    status: "todo",
-    priority: "high",
-    assigneeId: { _id: "unassigned", name: "Unassigned" },
-  },
-  {
-    _id: "2",
-    projectId: "000000000000000000000000",
-    title: "Build realtime Kanban",
-    status: "in-progress",
-    priority: "medium",
-    assigneeId: { _id: "unassigned", name: "Unassigned" },
-  },
-  {
-    _id: "3",
-    projectId: "000000000000000000000000",
-    title: "Deploy application",
-    status: "done",
-    priority: "high",
-    assigneeId: { _id: "unassigned", name: "Unassigned" },
-  }
-];
+import { projectService } from "@/lib/server/services/project.service";
 
 export type CreateTaskInput = {
   workspaceId: string;
@@ -51,9 +12,10 @@ export type CreateTaskInput = {
   priority?: TaskPriority;
   assigneeId?: string;
   dueDate?: string;
+  createdBy: string;
 };
 
-export type UpdateTaskInput = Partial<Omit<CreateTaskInput, "workspaceId" | "projectId">> & {
+export type UpdateTaskInput = Partial<Omit<CreateTaskInput, "workspaceId" | "projectId" | "createdBy">> & {
   taskId: string;
 };
 
@@ -64,23 +26,7 @@ function toObjectId(id: string) {
 export const taskService = {
   async create(input: CreateTaskInput) {
     const conn = await connectMongoose();
-
-    if (!conn || isMockMode) {
-      console.log("RUNNING IN MOCK DATA MODE");
-      const newTask: MockTask = {
-        _id: Math.random().toString(36).substring(7),
-        projectId: input.projectId || "000000000000000000000000",
-        workspaceId: input.workspaceId,
-        title: input.title,
-        description: input.description ?? "",
-        status: input.status ?? "todo",
-        priority: input.priority ?? "medium",
-        assigneeId: input.assigneeId ? { _id: input.assigneeId, name: "Mock User" } : { _id: "unassigned", name: "Unassigned" },
-        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
-      };
-      mockTasks.push(newTask);
-      return newTask;
-    }
+    if (!conn) throw new Error("Database connection failed");
 
     try {
       const doc = await TaskModel.create({
@@ -90,69 +36,40 @@ export const taskService = {
         description: input.description ?? "",
         status: input.status ?? "todo",
         priority: input.priority ?? "medium",
-        assigneeId: input.assigneeId ? toObjectId(input.assigneeId) : undefined,
+        assigneeId: input.assigneeId && mongoose.isValidObjectId(input.assigneeId) ? toObjectId(input.assigneeId) : undefined,
+        createdBy: toObjectId(input.createdBy),
         dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
       });
 
       const populated = await TaskModel.findById(doc._id).populate("assigneeId");
+      if (populated) {
+        await projectService.recalculateProgress(populated.projectId.toString());
+      }
       return populated;
     } catch (dbErr) {
-      console.error("Database operation failed, falling back to mock mode:", dbErr);
-      console.log("RUNNING IN MOCK DATA MODE");
-      const newTask: MockTask = {
-        _id: Math.random().toString(36).substring(7),
-        projectId: input.projectId || "000000000000000000000000",
-        workspaceId: input.workspaceId,
-        title: input.title,
-        description: input.description ?? "",
-        status: input.status ?? "todo",
-        priority: input.priority ?? "medium",
-        assigneeId: input.assigneeId ? { _id: input.assigneeId, name: "Mock User" } : { _id: "unassigned", name: "Unassigned" },
-        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
-      };
-      mockTasks.push(newTask);
-      return newTask;
+      console.error("Database operation failed in create task:", dbErr);
+      throw dbErr;
     }
   },
 
   async getById(taskId: string) {
     const conn = await connectMongoose();
-    
-    if (!conn || isMockMode) {
-      console.log("RUNNING IN MOCK DATA MODE");
-      return mockTasks.find((t) => t._id === taskId) || null;
-    }
+    if (!conn) throw new Error("Database connection failed");
 
     try {
-      return await TaskModel.findById(toObjectId(taskId)).lean();
+      return await TaskModel.findById(toObjectId(taskId))
+        .populate("assigneeId")
+        .populate("comments.userId")
+        .lean();
     } catch (dbErr) {
-      console.error("Database operation failed, falling back to mock mode:", dbErr);
-      console.log("RUNNING IN MOCK DATA MODE");
-      return mockTasks.find((t) => t._id === taskId) || null;
+      console.error("Database operation failed in getById task:", dbErr);
+      throw dbErr;
     }
   },
 
   async update(input: UpdateTaskInput) {
     const conn = await connectMongoose();
-
-    if (!conn || isMockMode) {
-      console.log("RUNNING IN MOCK DATA MODE");
-      const idx = mockTasks.findIndex((t) => t._id === input.taskId);
-      if (idx === -1) return null;
-      const updatedTask = { ...mockTasks[idx] };
-      if (input.title !== undefined) updatedTask.title = input.title;
-      if (input.description !== undefined) updatedTask.description = input.description;
-      if (input.status !== undefined) updatedTask.status = input.status;
-      if (input.priority !== undefined) updatedTask.priority = input.priority;
-      if (input.assigneeId !== undefined) {
-        updatedTask.assigneeId = input.assigneeId ? { _id: input.assigneeId, name: "Mock User" } : { _id: "unassigned", name: "Unassigned" };
-      }
-      if (input.dueDate !== undefined) {
-        updatedTask.dueDate = input.dueDate ? new Date(input.dueDate) : undefined;
-      }
-      mockTasks[idx] = updatedTask;
-      return updatedTask;
-    }
+    if (!conn) throw new Error("Database connection failed");
 
     try {
       const update: Record<string, unknown> = {};
@@ -161,75 +78,46 @@ export const taskService = {
       if (input.status !== undefined) update.status = input.status;
       if (input.priority !== undefined) update.priority = input.priority;
       if (input.assigneeId !== undefined) {
-        update.assigneeId = input.assigneeId ? toObjectId(input.assigneeId) : undefined;
+        update.assigneeId = input.assigneeId && mongoose.isValidObjectId(input.assigneeId) ? toObjectId(input.assigneeId) : null;
       }
       if (input.dueDate !== undefined) {
-        update.dueDate = input.dueDate ? new Date(input.dueDate) : undefined;
+        update.dueDate = input.dueDate ? new Date(input.dueDate) : null;
       }
 
       const doc = await TaskModel.findByIdAndUpdate(toObjectId(input.taskId), update, {
         new: true,
       }).populate("assigneeId");
 
+      if (doc) {
+        await projectService.recalculateProgress(doc.projectId.toString());
+      }
+
       return doc;
     } catch (dbErr) {
-      console.error("Database operation failed, falling back to mock mode:", dbErr);
-      console.log("RUNNING IN MOCK DATA MODE");
-      const idx = mockTasks.findIndex((t) => t._id === input.taskId);
-      if (idx === -1) return null;
-      const updatedTask = { ...mockTasks[idx] };
-      if (input.title !== undefined) updatedTask.title = input.title;
-      if (input.description !== undefined) updatedTask.description = input.description;
-      if (input.status !== undefined) updatedTask.status = input.status;
-      if (input.priority !== undefined) updatedTask.priority = input.priority;
-      if (input.assigneeId !== undefined) {
-        updatedTask.assigneeId = input.assigneeId ? { _id: input.assigneeId, name: "Mock User" } : { _id: "unassigned", name: "Unassigned" };
-      }
-      if (input.dueDate !== undefined) {
-        updatedTask.dueDate = input.dueDate ? new Date(input.dueDate) : undefined;
-      }
-      mockTasks[idx] = updatedTask;
-      return updatedTask;
+      console.error("Database operation failed in update task:", dbErr);
+      throw dbErr;
     }
   },
 
   async remove(taskId: string) {
     const conn = await connectMongoose();
-
-    if (!conn || isMockMode) {
-      console.log("RUNNING IN MOCK DATA MODE");
-      const idx = mockTasks.findIndex((t) => t._id === taskId);
-      if (idx === -1) return null;
-      const [removed] = mockTasks.splice(idx, 1);
-      return removed;
-    }
+    if (!conn) throw new Error("Database connection failed");
 
     try {
       const doc = await TaskModel.findByIdAndDelete(toObjectId(taskId)).populate("assigneeId");
+      if (doc) {
+        await projectService.recalculateProgress(doc.projectId.toString());
+      }
       return doc;
     } catch (dbErr) {
-      console.error("Database operation failed, falling back to mock mode:", dbErr);
-      console.log("RUNNING IN MOCK DATA MODE");
-      const idx = mockTasks.findIndex((t) => t._id === taskId);
-      if (idx === -1) return null;
-      const [removed] = mockTasks.splice(idx, 1);
-      return removed;
+      console.error("Database operation failed in remove task:", dbErr);
+      throw dbErr;
     }
   },
 
   async listByProject(params: { projectId?: string }) {
     const conn = await connectMongoose();
-
-    if (!conn || isMockMode) {
-      console.log("RUNNING IN MOCK DATA MODE");
-      if (params.projectId) {
-        mockTasks.forEach((t) => {
-          t.projectId = params.projectId!;
-        });
-        return mockTasks.filter(t => t.projectId === params.projectId);
-      }
-      return [...mockTasks];
-    }
+    if (!conn) throw new Error("Database connection failed");
 
     try {
       const query = params.projectId ? { projectId: toObjectId(params.projectId) } : {};
@@ -239,15 +127,8 @@ export const taskService = {
         .lean();
       return docs;
     } catch (dbErr) {
-      console.error("Database operation failed, falling back to mock mode:", dbErr);
-      console.log("RUNNING IN MOCK DATA MODE");
-      if (params.projectId) {
-        mockTasks.forEach((t) => {
-          t.projectId = params.projectId!;
-        });
-        return mockTasks.filter(t => t.projectId === params.projectId);
-      }
-      return [...mockTasks];
+      console.error("Database operation failed in listByProject task:", dbErr);
+      throw dbErr;
     }
   },
 };

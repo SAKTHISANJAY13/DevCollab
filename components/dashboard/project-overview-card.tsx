@@ -1,9 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, CheckCircle2, CircleDot, PlayCircle } from "lucide-react";
+import { Calendar, CheckCircle2, CircleDot, PlayCircle, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DashboardProject } from "@/lib/mock/dashboard";
+
+export interface DashboardProject {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  status: "planning" | "active" | "paused" | "completed" | "archived";
+  deadline: string;
+  members: Array<{
+    id: string;
+    name: string;
+    initials: string;
+    avatarUrl?: string;
+  }>;
+  accentColor: string;
+}
 
 interface ProjectOverviewCardProps extends DashboardProject {
   className?: string;
@@ -28,7 +43,6 @@ export function ProjectOverviewCard({
         className
       )}
     >
-      {/* Decorative background glow matching the project's accent */}
       <div
         className={cn(
           "pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-linear-to-br blur-3xl opacity-30 transition-opacity duration-300 group-hover:opacity-50",
@@ -48,12 +62,15 @@ export function ProjectOverviewCard({
 
         <span
           className={cn(
-            "flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-            status === "active" && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-            status === "paused" && "bg-amber-500/10 text-amber-400 border border-amber-500/20",
-            status === "completed" && "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+            "flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border",
+            status === "planning" && "bg-purple-500/10 text-purple-400 border-purple-500/20",
+            status === "active" && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+            status === "paused" && "bg-amber-500/10 text-amber-400 border-amber-500/20",
+            status === "completed" && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+            status === "archived" && "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
           )}
         >
+          {status === "planning" && <Circle className="h-2.5 w-2.5" />}
           {status === "active" && <CircleDot className="h-2.5 w-2.5 animate-pulse" />}
           {status === "paused" && <PlayCircle className="h-2.5 w-2.5" />}
           {status === "completed" && <CheckCircle2 className="h-2.5 w-2.5" />}
@@ -61,7 +78,6 @@ export function ProjectOverviewCard({
         </span>
       </div>
 
-      {/* Progress Section */}
       <div className="mt-6 space-y-1.5">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground font-medium flex items-center gap-1">
@@ -77,14 +93,12 @@ export function ProjectOverviewCard({
         </div>
       </div>
 
-      {/* Footer Info */}
       <div className="mt-5 flex items-center justify-between border-t border-border/40 pt-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5" />
           <span>Due {deadline}</span>
         </div>
 
-        {/* Overlapping Avatar Stack */}
         <div className="flex items-center">
           <div className="flex -space-x-1.5 overflow-hidden">
             {members.map((member) => (

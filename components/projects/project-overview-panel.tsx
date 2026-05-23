@@ -2,10 +2,26 @@
 
 import { Calendar, CircleDot, PlayCircle, CheckCircle2, Circle, AlertCircle, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MockProject } from "@/lib/mock/projects";
+
+export interface ProjectDetail {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  priority: "low" | "medium" | "high" | "urgent";
+  status: "planning" | "active" | "paused" | "completed" | "archived";
+  dueDate: string;
+  tasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    dueDate: string;
+  }>;
+}
 
 interface ProjectOverviewPanelProps {
-  project: MockProject;
+  project: ProjectDetail;
 }
 
 export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
@@ -32,6 +48,7 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
     active: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
     paused: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    archived: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
   };
 
   return (
@@ -56,6 +73,7 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
                 {status === "active" && <CircleDot className="h-2.5 w-2.5 animate-pulse" />}
                 {status === "paused" && <PlayCircle className="h-2.5 w-2.5" />}
                 {status === "completed" && <CheckCircle2 className="h-2.5 w-2.5" />}
+                {status === "archived" && <Circle className="h-2.5 w-2.5 opacity-65" />}
                 {status}
               </span>
             </div>
@@ -69,7 +87,7 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
               <span className="text-xs text-muted-foreground block">Target Completion Date</span>
               <span className="flex items-center gap-1.5 text-xs text-foreground mt-1 font-medium">
                 <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-                {new Date(dueDate).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+                {dueDate ? new Date(dueDate).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : "No deadline"}
               </span>
             </div>
             <div>
@@ -131,7 +149,7 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
         </div>
 
         {/* Milestone Warnings */}
-        {tasks.some((t) => t.status !== "done" && new Date(t.dueDate) < new Date()) && (
+        {tasks.some((t) => t.status !== "done" && t.dueDate && new Date(t.dueDate) < new Date()) && (
           <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4 flex gap-3 items-start">
             <AlertCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
             <div>

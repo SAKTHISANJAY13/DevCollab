@@ -1,26 +1,115 @@
 "use client";
 
-import { useState } from "react";
-import { Plus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProjectCard } from "@/components/projects/project-card";
 import { ProjectFilters } from "@/components/projects/project-filters";
 import { CreateProjectModal } from "@/components/projects/create-project-modal";
-import { mockProjects, type MockProject } from "@/lib/mock/projects";
+import { projectService } from "@/services";
+import { useSocket } from "@/hooks/use-socket";
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<MockProject[]>(mockProjects);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  // Handle adding project dynamically
-  const handleCreateProject = (newProject: MockProject) => {
-    setProjects((prev) => [newProject, ...prev]);
+  const { socket } = useSocket({ projectId: "global" });
+
+  const fetchProjects = async (showLoading = false) => {
+    if (showLoading) setIsLoading(true);
+    try {
+      const list = await projectService.list();
+      const formatted = list.map((p: any) => ({
+        id: p._id || p.id,
+        title: p.title || p.name || "Untitled Project",
+        description: p.description || "Collaborative dev workspace project.",
+        progress: p.progress || 0,
+        priority: p.priority || "medium",
+        status: p.status || "active",
+        dueDate: p.dueDate ? new Date(p.dueDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+        members: (p.members || []).map((m: any) => ({
+          id: m._id || m.id,
+          name: m.name || "Member",
+          initials: m.name ? m.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "M",
+          role: m.role || "Developer",
+          avatarColor: "bg-indigo-600 text-indigo-100",
+        })),
+        tasks: p.tasks || [],
+        activities: p.activities || [],
+      }));
+      setProjects(formatted);
+    } catch (err) {
+      console.error("Failed to load projects:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Perform search and filtering
+  useEffect(() => {
+    fetchProjects(true);
+
+    // Fetch workspace members for assignee mapping
+    fetch("/api/workspace")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.workspace) {
+          const list = (data.workspace.members || []).map((m: any) => {
+            const u = m.userId;
+            if (!u) return null;
+            return {
+              id: u._id || u.id,
+              name: u.name || "Member",
+              initials: u.name ? u.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "M",
+            };
+          }).filter(Boolean);
+          setMembers(list);
+        }
+      })
+      .catch((err) => console.error("Error loading members for project creations:", err));
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const onProjectCreated = (newProject: any) => {
+      console.log("[Projects] Socket projectCreated received:", newProject);
+      fetchProjects();
+    };
+
+    const onProjectUpdated = (updatedProject: any) => {
+      console.log("[Projects] Socket projectUpdated received:", updatedProject);
+      fetchProjects();
+    };
+
+    socket.on("projectCreated", onProjectCreated);
+    socket.on("projectUpdated", onProjectUpdated);
+
+    return () => {
+      socket.off("projectCreated", onProjectCreated);
+      socket.off("projectUpdated", onProjectUpdated);
+    };
+  }, [socket]);
+
+  const handleCreateProject = async (newProject: any) => {
+    try {
+      await projectService.create({
+        title: newProject.title,
+        description: newProject.description,
+        status: newProject.status,
+        priority: newProject.priority,
+        dueDate: newProject.dueDate,
+        members: newProject.members?.map((m: any) => m.id),
+      });
+    } catch (err) {
+      console.error("Failed to create project:", err);
+    }
+  };
+
   const filteredProjects = projects.filter((project) => {
     const matchesSearch =
       project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -63,7 +152,12 @@ export default function ProjectsPage() {
       />
 
       {/* Grid of Projects */}
-      {filteredProjects.length > 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+          <p className="text-sm text-muted-foreground">Loading workspace projects...</p>
+        </div>
+      ) : filteredProjects.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
           {filteredProjects.map((project) => (
             <ProjectCard key={project.id} project={project} />
@@ -90,6 +184,7 @@ export default function ProjectsPage() {
         isOpen={isCreateOpen}
         onClose={setIsCreateOpen}
         onCreateProject={handleCreateProject}
+        members={members}
       />
     </div>
   );

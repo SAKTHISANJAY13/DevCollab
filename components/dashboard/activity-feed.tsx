@@ -2,7 +2,20 @@
 
 import { CheckCircle2, FolderKanban, Users, ShieldAlert, GitCommit } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ActivityItem } from "@/lib/mock/dashboard";
+
+export interface ActivityItem {
+  id: string;
+  user: {
+    name: string;
+    initials: string;
+    avatarUrl?: string;
+  };
+  action: string;
+  target: string;
+  projectName?: string;
+  timestamp: string;
+  type: "task" | "project" | "team" | "system";
+}
 
 const iconMap = {
   task: CheckCircle2,
@@ -24,6 +37,15 @@ interface ActivityFeedProps {
 }
 
 export function ActivityFeed({ activities, className }: ActivityFeedProps) {
+  if (activities.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-6 text-center space-y-2 border border-dashed border-border/40 rounded-xl bg-card/5">
+        <GitCommit className="h-5 w-5 text-muted-foreground animate-pulse" />
+        <p className="text-xs text-muted-foreground">No recent activity found. Action logs will appear here as your team works.</p>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("space-y-6", className)}>
       <div className="relative pl-6 space-y-6 before:absolute before:left-2.75 before:top-2 before:bottom-2 before:w-px before:bg-border/50">
@@ -33,7 +55,6 @@ export function ActivityFeed({ activities, className }: ActivityFeedProps) {
 
           return (
             <div key={activity.id} className="relative group/item">
-              {/* Timeline marker */}
               <div
                 className={cn(
                   "absolute -left-6.75 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background text-[10px] transition-transform duration-200 group-hover/item:scale-110",
@@ -43,7 +64,6 @@ export function ActivityFeed({ activities, className }: ActivityFeedProps) {
                 <Icon className="h-3 w-3" />
               </div>
 
-              {/* Activity details */}
               <div className="flex flex-col space-y-1 rounded-lg border border-border/20 bg-card/10 p-3 transition-colors hover:border-border/40 hover:bg-card/20">
                 <div className="flex items-start justify-between gap-4">
                   <div className="text-xs text-foreground font-medium">

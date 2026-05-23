@@ -1,14 +1,23 @@
 "use client";
 
-import { FolderKanban, CheckCircle, Clock, Users, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { FolderKanban, CheckCircle, Clock, Users, ArrowUpRight, ArrowDownRight, Minus, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DashboardStat } from "@/lib/mock/dashboard";
+
+export interface DashboardStat {
+  label: string;
+  value: string;
+  change: string;
+  trend: "up" | "down" | "stable";
+  iconName: "folder-kanban" | "check-circle" | "clock" | "users" | "alert-circle";
+  colorClass: string;
+}
 
 const iconMap = {
   "folder-kanban": FolderKanban,
   "check-circle": CheckCircle,
   "clock": Clock,
   "users": Users,
+  "alert-circle": AlertCircle,
 };
 
 interface DashboardStatCardProps extends DashboardStat {
@@ -33,7 +42,6 @@ export function DashboardStatCard({
         className
       )}
     >
-      {/* Light gradient highlight on hover */}
       <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-primary/5 blur-2xl transition-all duration-300 group-hover:bg-primary/10" />
 
       <div className="flex items-center justify-between">

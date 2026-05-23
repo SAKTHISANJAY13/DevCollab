@@ -1,10 +1,21 @@
 "use client";
 
 import { GitPullRequest, CheckCircle2, Pause, CircleDot, User } from "lucide-react";
-import type { MockActivity } from "@/lib/mock/projects";
+
+export interface ProjectActivityItem {
+  id: string;
+  user: {
+    name: string;
+    initials: string;
+    avatarUrl?: string;
+  };
+  action: string;
+  target: string;
+  timestamp: string;
+}
 
 interface ProjectActivityFeedProps {
-  activities: MockActivity[];
+  activities: ProjectActivityItem[];
 }
 
 export function ProjectActivityFeed({ activities }: ProjectActivityFeedProps) {
@@ -19,7 +30,7 @@ export function ProjectActivityFeed({ activities }: ProjectActivityFeedProps) {
     if (act.includes("paused")) {
       return <Pause className="h-3.5 w-3.5 text-amber-400" />;
     }
-    if (act.includes("code") || act.includes("push")) {
+    if (act.includes("code") || act.includes("push") || act.includes("commit")) {
       return <GitPullRequest className="h-3.5 w-3.5 text-sky-400" />;
     }
     return <User className="h-3.5 w-3.5 text-muted-foreground" />;
@@ -39,7 +50,6 @@ export function ProjectActivityFeed({ activities }: ProjectActivityFeedProps) {
         {activities.map((act, actIdx) => (
           <li key={act.id}>
             <div className="relative pb-8">
-              {/* Vertical connector line */}
               {actIdx !== activities.length - 1 ? (
                 <span
                   className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-border/20"
@@ -48,14 +58,12 @@ export function ProjectActivityFeed({ activities }: ProjectActivityFeedProps) {
               ) : null}
 
               <div className="relative flex space-x-3">
-                {/* Event Icon container */}
                 <div>
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 border border-border/40 select-none">
                     {getActivityIcon(act.action)}
                   </span>
                 </div>
 
-                {/* Event Content */}
                 <div className="flex-1 min-w-0 pt-1.5 flex justify-between space-x-4">
                   <div>
                     <p className="text-xs text-muted-foreground">
