@@ -1,20 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Sparkles,
   PlusCircle,
   UserPlus,
   FolderKanban,
-  Send,
-  Bot,
-  Loader2,
   Calendar,
   Sparkle,
   ArrowRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 // Components
 import {
@@ -74,7 +69,6 @@ function formatTimeAgo(dateInput: any) {
 
 export function DashboardOverview({
   userDisplayName = "Developer",
-  userAvatarUrl,
 }: DashboardOverviewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [metrics, setMetrics] = useState<WorkspaceMetrics | null>(null);
@@ -88,39 +82,12 @@ export function DashboardOverview({
   // Quick Action Dialog states
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [isAiOpen, setIsAiOpen] = useState(false);
 
   // Form states
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
-
-  // AI Assistant states
-  const [aiInput, setAiInput] = useState("");
-  const [aiTyping, setAiTyping] = useState(false);
-  const [aiMessages, setAiMessages] = useState<
-    Array<{ sender: "user" | "ai"; text: string; timestamp: string }>
-  >([]);
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Initialize AI message after name is resolved
-  useEffect(() => {
-    setAiMessages([
-      {
-        sender: "ai",
-        text: `Hello ${userDisplayName}! I am your DevCollab AI assistant. Ask me anything about your active projects, tasks, or workspace velocity.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      },
-    ]);
-  }, [userDisplayName]);
-
-  useEffect(() => {
-    if (isAiOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [aiMessages, isAiOpen]);
 
   const fetchDashboardData = async (showLoading = false) => {
     if (showLoading) setIsLoading(true);
@@ -235,53 +202,7 @@ export function DashboardOverview({
     }
   };
 
-  const handleSendAiMessage = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!aiInput.trim()) return;
 
-    const text = aiInput;
-    setAiInput("");
-
-    const newMsg = {
-      sender: "user" as const,
-      text,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    };
-
-    setAiMessages((prev) => [...prev, newMsg]);
-    setAiTyping(true);
-
-    setTimeout(() => {
-      setAiTyping(false);
-      let reply = `I'm analyzing your DevCollab workspaces. You currently have ${projects.length} active projects and ${metrics?.pendingTasks ?? 0} pending tasks. ${metrics?.overdueTasks && metrics.overdueTasks > 0 ? `You have ${metrics.overdueTasks} overdue tasks that need attention.` : "Everything looks healthy!"}`;
-
-      const lower = text.toLowerCase();
-      if (lower.includes("due") || lower.includes("deadline") || lower.includes("task")) {
-        reply = `Looking at your boards, you have ${metrics?.pendingTasks ?? 0} pending tasks. ${metrics?.overdueTasks && metrics.overdueTasks > 0 ? `Specifically, ${metrics.overdueTasks} tasks are currently overdue and require your immediate attention.` : "No tasks are currently overdue."}`;
-      } else if (lower.includes("project") || lower.includes("active")) {
-        reply = `Here is a summary of active projects: \n\n${
-          projects.length > 0
-            ? projects.map((p, i) => `${i + 1}. *${p.title || p.name}* - ${p.progress}% complete (${p.status})`).join("\n")
-            : "No active projects found."
-        }`;
-      } else if (lower.includes("velocity") || lower.includes("chart") || lower.includes("productivity")) {
-        reply = `According to our velocity charts, you have completed ${metrics?.tasksCompleted ?? 0} tasks overall in this workspace. Team velocity has synced directly with MongoDB databases in real time.`;
-      }
-
-      setAiMessages((prev) => [
-        ...prev,
-        {
-          sender: "ai" as const,
-          text: reply,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        },
-      ]);
-    }, 1100);
-  };
-
-  const handleAiSuggestion = (suggestion: string) => {
-    setAiInput(suggestion);
-  };
 
   const stats = [
     {
@@ -462,23 +383,10 @@ export function DashboardOverview({
               </button>
               <button
                 onClick={() => setIsInviteOpen(true)}
-                className="flex flex-col items-center justify-center p-4 rounded-lg bg-card border border-border/40 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all text-center group cursor-pointer"
+                className="flex flex-col items-center justify-center p-4 rounded-lg bg-card border border-border/40 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all text-center group cursor-pointer col-span-2"
               >
                 <UserPlus className="h-5 w-5 text-sky-400 group-hover:scale-105 transition-transform" />
                 <span className="text-xs font-semibold text-foreground mt-2">Invite Team</span>
-              </button>
-              <button
-                onClick={() => setIsAiOpen(true)}
-                className="flex flex-col items-center justify-center p-4 rounded-lg bg-indigo-600/10 border border-indigo-500/30 hover:border-indigo-500/50 hover:bg-indigo-500/15 transition-all text-center group cursor-pointer relative"
-              >
-                <div className="absolute right-2 top-2">
-                  <span className="flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-1.5 w-1.5 rounded-full bg-indigo-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
-                  </span>
-                </div>
-                <Sparkles className="h-5 w-5 text-indigo-400 group-hover:scale-105 transition-transform animate-pulse" />
-                <span className="text-xs font-semibold text-indigo-400 mt-2">Ask AI</span>
               </button>
             </div>
           </div>
@@ -613,128 +521,7 @@ export function DashboardOverview({
         </DialogContent>
       </Dialog>
 
-      {/* AI Assistant Dialog */}
-      <Dialog open={isAiOpen} onOpenChange={setIsAiOpen}>
-        <DialogContent className="sm:max-w-120 p-0 overflow-hidden flex flex-col h-130 bg-zinc-950 border border-border/60">
-          <div className="p-4 border-b border-border/50 bg-secondary/20 flex items-center gap-2 shrink-0">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              <Bot className="h-4 w-4" />
-            </div>
-            <div>
-              <DialogTitle className="text-sm font-bold flex items-center gap-1.5">
-                DevCollab AI
-              </DialogTitle>
-              <p className="text-[10px] text-muted-foreground">
-                Powered by Gemini & workspace context
-              </p>
-            </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-card/20">
-            {aiMessages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={cn(
-                  "flex gap-3 max-w-[85%]",
-                  msg.sender === "user" ? "ml-auto flex-row-reverse" : ""
-                )}
-              >
-                <div
-                  className={cn(
-                    "flex h-6 w-6 shrink-0 select-none items-center justify-center rounded-md border text-[9px] font-bold overflow-hidden",
-                    msg.sender === "ai"
-                      ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
-                      : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {msg.sender === "ai" ? (
-                    "AI"
-                  ) : userAvatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={userAvatarUrl} alt={userDisplayName} className="h-full w-full object-cover" />
-                  ) : (
-                    "ME"
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <div
-                    className={cn(
-                      "rounded-lg px-3 py-2 text-xs leading-relaxed whitespace-pre-line shadow-sm",
-                      msg.sender === "ai"
-                        ? "bg-muted/40 text-foreground border border-border/30"
-                        : "bg-indigo-600 text-white"
-                    )}
-                  >
-                    {msg.text}
-                  </div>
-                  <span className="text-[8px] text-muted-foreground block text-right pr-1">
-                    {msg.timestamp}
-                  </span>
-                </div>
-              </div>
-            ))}
-
-            {aiTyping && (
-              <div className="flex gap-3 max-w-[80%]">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 text-[9px] font-bold">
-                  AI
-                </div>
-                <div className="flex items-center gap-1 rounded-lg bg-muted/40 border border-border/30 px-3 py-2 text-xs text-muted-foreground shadow-sm">
-                  <Loader2 className="h-3 w-3 animate-spin text-indigo-400" />
-                  <span>Thinking...</span>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {aiMessages.length === 1 && !aiTyping && (
-            <div className="p-3 bg-secondary/10 border-t border-border/30 shrink-0 space-y-1.5">
-              <p className="text-[10px] font-semibold text-muted-foreground">Try asking:</p>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => handleAiSuggestion("Which tasks are due soon?")}
-                  className="text-[10px] text-foreground bg-muted border border-border/40 hover:border-indigo-500/40 hover:bg-indigo-500/5 px-2 py-1 rounded transition-all cursor-pointer"
-                >
-                  Which tasks are due soon?
-                </button>
-                <button
-                  onClick={() => handleAiSuggestion("Summarize my project progress")}
-                  className="text-[10px] text-foreground bg-muted border border-border/40 hover:border-indigo-500/40 hover:bg-indigo-500/5 px-2 py-1 rounded transition-all cursor-pointer"
-                >
-                  Summarize my project progress
-                </button>
-                <button
-                  onClick={() => handleAiSuggestion("What is our weekly velocity?")}
-                  className="text-[10px] text-foreground bg-muted border border-border/40 hover:border-indigo-500/40 hover:bg-indigo-500/5 px-2 py-1 rounded transition-all cursor-pointer"
-                >
-                  What is our weekly velocity?
-                </button>
-              </div>
-            </div>
-          )}
-
-          <form
-            onSubmit={handleSendAiMessage}
-            className="p-3 border-t border-border/40 bg-card flex gap-2 items-center shrink-0"
-          >
-            <input
-              type="text"
-              placeholder="Ask anything..."
-              value={aiInput}
-              onChange={(e) => setAiInput(e.target.value)}
-              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-            />
-            <button
-              type="submit"
-              disabled={!aiInput.trim()}
-              className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors disabled:opacity-40 disabled:hover:bg-indigo-600 cursor-pointer"
-            >
-              <Send className="h-3.5 w-3.5" />
-            </button>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
