@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { connectMongoose } from "@/lib/db/mongoose";
 import { getCurrentMongoUser } from "@/lib/server/auth/getCurrentMongoUser";
 import { encrypt } from "@/lib/crypto";
-import { UserKeyModel, USER_KEY_PROVIDERS } from "@/models/UserKey";
+import { UserKeyModel, USER_KEY_PROVIDERS, type UserKeyProvider } from "@/models/UserKey";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const apiKey = String(body?.apiKey || "").trim();
-    const provider = String(body?.provider || "openai").trim();
+    const provider = String(body?.provider || "openai").trim() as UserKeyProvider;
 
     if (!apiKey) {
       return NextResponse.json({ error: "Missing apiKey" }, { status: 400 });
@@ -42,21 +42,11 @@ export async function POST(req: NextRequest) {
       await UserKeyModel.updateMany({ userId: String(user._id) }, { $set: { isActive: false } });
     }
 
+    const query = { userId: user._id, provider } as any;
     await UserKeyModel.findOneAndUpdate(
-      {
-        userId: String(user._id),
-        provider: provider,
-      },
-      {
-        $set: {
-          apiKey: encrypted,
-          isActive: makeActive,
-        },
-      },
-      {
-        upsert: true,
-        new: true,
-      }
+      query,
+      { $set: { apiKey: encrypted, isActive: makeActive } },
+      { upsert: true, new: true },
     );
 
     return NextResponse.json({ success: true }, { status: 200 });

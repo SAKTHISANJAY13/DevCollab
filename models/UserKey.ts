@@ -1,4 +1,4 @@
-import mongoose, { Schema, type InferSchemaType } from "mongoose";
+import { Schema, model, models, type InferSchemaType, type Model } from "mongoose";
 
 export const USER_KEY_PROVIDERS = ["openai", "groq", "anthropic", "gemini"] as const;
 export type UserKeyProvider = (typeof USER_KEY_PROVIDERS)[number];
@@ -22,6 +22,4 @@ UserKeySchema.index({ userId: 1, provider: 1 }, { unique: true });
 
 export type UserKeyDoc = InferSchemaType<typeof UserKeySchema>;
 
-const UserKey = mongoose.models.UserKey || mongoose.model("UserKey", UserKeySchema);
-export default UserKey;
-export const UserKeyModel = UserKey;
+export const UserKeyModel = (models.UserKey as Model<UserKeyDoc>) || model<UserKeyDoc>("UserKey", UserKeySchema);

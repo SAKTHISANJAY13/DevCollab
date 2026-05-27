@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { connectMongoose } from "@/lib/db/mongoose";
 import { getCurrentMongoUser } from "@/lib/server/auth/getCurrentMongoUser";
-import { UserKeyModel, USER_KEY_PROVIDERS } from "@/models/UserKey";
+import { UserKeyModel, USER_KEY_PROVIDERS, type UserKeyProvider } from "@/models/UserKey";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const provider = String(body?.provider || "").trim();
+    const provider = String(body?.provider || "").trim() as UserKeyProvider;
 
     const validProviders = USER_KEY_PROVIDERS as unknown as string[];
     if (!validProviders.includes(provider)) {
