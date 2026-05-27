@@ -66,3 +66,37 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* Clerk UI visibility fixes: ensure text and inputs are visible in dark theme */
+/* Targets common Clerk root/iframe wrappers and falls back to generic selectors. */
+[data-clerk], .clerk, .clerk-root, .clerk-card, .clerk-modal {
+  color: var(--foreground) !important;
+}
+
+[data-clerk] a, .clerk a, [data-clerk] button, .clerk button {
+  color: var(--foreground) !important;
+}
+
+[data-clerk] input, .clerk input, [data-clerk] textarea, .clerk textarea {
+  color: var(--foreground) !important;
+  background: rgba(255,255,255,0.02) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+[data-clerk] ::placeholder, .clerk ::placeholder {
+  color: var(--muted-foreground) !important;
+  opacity: 1 !important;
+}
+
+/* OTP inputs and small menu items sometimes use specific classes; these selectors help cover them. */
+.clerk-otp-input, .clerk-otp-field, [data-clerk] .clerk-otp-input, [data-clerk] .clerk-otp-field {
+  color: var(--foreground) !important;
+  background: rgba(255,255,255,0.03) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+/* Ensure user menu items (Manage account / Sign out) are readable */
+[data-clerk] .clerk-user-menu-item, .clerk-user-menu-item, [data-clerk] .clerk__item, .clerk__item {
+  color: var(--foreground) !important;
+}
+
+
