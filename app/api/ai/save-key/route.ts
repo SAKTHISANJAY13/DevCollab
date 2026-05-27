@@ -34,18 +34,29 @@ export async function POST(req: NextRequest) {
     const encrypted = encrypt(apiKey);
 
     // If there is no active key for the user, or if explicitly requested, make this active
-    const activeKeyExists = await UserKeyModel.findOne({ userId: user._id, isActive: true }).lean();
+    const activeKeyExists = await UserKeyModel.findOne({ userId: String(user._id), isActive: true }).lean();
     const makeActive = !activeKeyExists || body?.makeActive === true;
 
     if (makeActive) {
       // Deactivate other providers' keys first
-      await UserKeyModel.updateMany({ userId: user._id }, { $set: { isActive: false } });
+      await UserKeyModel.updateMany({ userId: String(user._id) }, { $set: { isActive: false } });
     }
 
     await UserKeyModel.findOneAndUpdate(
-      { userId: user._id, provider },
-      { $set: { apiKey: encrypted, isActive: makeActive } },
-      { upsert: true, new: true },
+      {
+        userId: String(user._id),
+        provider: provider,
+      },
+      {
+        $set: {
+          apiKey: encrypted,
+          isActive: makeActive,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+      }
     );
 
     return NextResponse.json({ success: true }, { status: 200 });

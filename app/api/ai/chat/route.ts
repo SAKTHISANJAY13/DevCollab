@@ -54,9 +54,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
     }
 
-    let keyDoc = await UserKeyModel.findOne({ userId: user._id, isActive: true }).lean();
+    let keyDoc = await UserKeyModel.findOne({ userId: String(user._id), isActive: true }).lean();
     if (!keyDoc) {
-      keyDoc = await UserKeyModel.findOne({ userId: user._id }).lean();
+      keyDoc = await UserKeyModel.findOne({ userId: String(user._id) }).lean();
     }
 
     if (!keyDoc?.apiKey) {

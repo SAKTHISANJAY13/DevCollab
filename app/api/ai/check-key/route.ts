@@ -17,7 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
     }
 
-    const keyDocs = await UserKeyModel.find({ userId: user._id }).select("provider isActive").lean();
+    const keyDocs = await UserKeyModel.find({ userId: String(user._id) }).select("provider isActive").lean();
     
     let activeProvider: string | null = null;
     const savedProviders = keyDocs.map((k) => k.provider);

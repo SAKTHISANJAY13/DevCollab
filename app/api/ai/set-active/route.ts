@@ -26,14 +26,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify key exists for this provider
-    const targetKey = await UserKeyModel.findOne({ userId: user._id, provider }).lean();
+    const targetKey = await UserKeyModel.findOne({ userId: String(user._id), provider }).lean();
     if (!targetKey) {
       return NextResponse.json({ error: `No saved API key found for provider: ${provider}` }, { status: 400 });
     }
 
     // Set all other keys to inactive, and this one to active
-    await UserKeyModel.updateMany({ userId: user._id }, { $set: { isActive: false } });
-    await UserKeyModel.updateOne({ userId: user._id, provider }, { $set: { isActive: true } });
+    await UserKeyModel.updateMany({ userId: String(user._id) }, { $set: { isActive: false } });
+    await UserKeyModel.updateOne({ userId: String(user._id), provider }, { $set: { isActive: true } });
 
     return NextResponse.json({ success: true, activeProvider: provider }, { status: 200 });
   } catch (err) {

@@ -1,11 +1,15 @@
-import { Schema, model, models, type InferSchemaType } from "mongoose";
+import mongoose, { Schema, type InferSchemaType } from "mongoose";
 
 export const USER_KEY_PROVIDERS = ["openai", "groq", "anthropic", "gemini"] as const;
 export type UserKeyProvider = (typeof USER_KEY_PROVIDERS)[number];
 
 export const UserKeySchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    userId: {
+      type: String,
+      required: true,
+      index: true,
+    },
     provider: { type: String, enum: USER_KEY_PROVIDERS, required: true, default: "openai" },
     apiKey: { type: String, required: true }, // encrypted
     isActive: { type: Boolean, default: false },
@@ -18,5 +22,6 @@ UserKeySchema.index({ userId: 1, provider: 1 }, { unique: true });
 
 export type UserKeyDoc = InferSchemaType<typeof UserKeySchema>;
 
-delete models.UserKey;
-export const UserKeyModel = model("UserKey", UserKeySchema);
+const UserKey = mongoose.models.UserKey || mongoose.model("UserKey", UserKeySchema);
+export default UserKey;
+export const UserKeyModel = UserKey;
