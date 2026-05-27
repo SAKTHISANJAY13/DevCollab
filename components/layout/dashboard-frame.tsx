@@ -8,9 +8,10 @@ import { DevBotChat } from "@/components/chatbot/devbot-chat";
 
 type DashboardFrameProps = {
   children: React.ReactNode;
+  isAgentOpen?: boolean;
 };
 
-export function DashboardFrame({ children }: DashboardFrameProps) {
+export function DashboardFrame({ children, isAgentOpen }: DashboardFrameProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export function DashboardFrame({ children }: DashboardFrameProps) {
       </div>
 
       {/* DevBot floating chat — available across all dashboard pages */}
-      <DevBotChat />
+      <DevBotChat isAgentOpen={isAgentOpen} />
     </div>
   );
 }

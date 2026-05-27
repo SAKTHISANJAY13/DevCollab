@@ -58,9 +58,14 @@ export async function connectMongoose() {
           bufferCommands: false,
           serverSelectionTimeoutMS: 2000, // Short timeout for fast failover
         })
-        .then((m) => {
+        .then(async (m) => {
           isMockMode = false;
           globalCache.conn = m;
+          try {
+            await m.connection.collection("userkeys").dropIndex("userId_1");
+          } catch (err) {
+            // Ignore if index doesn't exist or collection doesn't exist yet
+          }
           return m;
         })
         .catch((err) => {

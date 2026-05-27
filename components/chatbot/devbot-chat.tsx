@@ -149,7 +149,7 @@ const SUGGESTIONS = [
 ];
 
 // ---------- Main Component ----------
-export function DevBotChat() {
+export function DevBotChat({ isAgentOpen }: { isAgentOpen?: boolean }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -294,7 +294,8 @@ export function DevBotChat() {
         onClick={() => setOpen((o) => !o)}
         aria-label="Open DevBot"
         className={cn(
-          "fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-full shadow-lg shadow-[#6e6aed]/30 transition-all duration-200",
+          "fixed bottom-5 z-50 flex h-12 w-12 items-center justify-center rounded-full shadow-lg shadow-[#6e6aed]/30 transition-all duration-300",
+          isAgentOpen ? "right-[calc(18%+1.25rem)]" : "right-5",
           open
             ? "bg-[#242429] ring-1 ring-[#27272a] text-[#ececee] scale-95"
             : "bg-[#6e6aed] text-white hover:bg-[#5b57d6] hover:scale-105"
@@ -318,7 +319,8 @@ export function DevBotChat() {
       {open && (
         <div
           className={cn(
-            "fixed bottom-20 right-5 z-50 flex flex-col overflow-hidden rounded-2xl border border-[#27272a] bg-[#121214] shadow-2xl shadow-black/50 transition-all duration-200",
+            "fixed bottom-20 z-50 flex flex-col overflow-hidden rounded-2xl border border-[#27272a] bg-[#121214] shadow-2xl shadow-black/50 transition-all duration-300",
+            isAgentOpen ? "right-[calc(18%+1.25rem)]" : "right-5",
             expanded
               ? "h-[min(680px,80vh)] w-[min(520px,calc(100vw-2rem))]"
               : "h-[min(560px,75vh)] w-[min(380px,calc(100vw-2rem))]"
