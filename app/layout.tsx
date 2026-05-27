@@ -38,6 +38,12 @@ export default function RootLayout({
               footerActionLink: "text-[#6e6aed] hover:text-[#5b57d6]",
               dividerText: "text-[#8b8b93]",
               dividerLine: "bg-[#27272a]",
+              otpCodeFieldInput:
+                "border border-border/80 bg-secondary/40 text-foreground font-semibold text-xl text-center focus:border-primary focus:ring-2 focus:ring-primary/30 transition-all rounded-lg shadow-inner",
+              otpCodeFieldInputs: "gap-2 justify-center py-2",
+              identityPreviewText: "text-foreground font-medium",
+              identityPreviewEditButton: "text-primary hover:underline font-medium text-xs",
+              formResendCodeLink: "text-primary hover:underline font-semibold text-sm cursor-pointer",
             }
           }}
         >
