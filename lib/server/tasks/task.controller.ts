@@ -47,30 +47,7 @@ export async function requireAuth() {
   return { ok: true as const, user };
 }
 
-interface SeededAssignee {
-  _id?: { toString(): string } | string;
-  name?: string;
-  avatarUrl?: string;
-}
-
-interface TaskInputDoc {
-  toObject?: () => {
-    _id?: { toString(): string } | string;
-    title?: string;
-    priority?: string;
-    status?: string;
-    assigneeId?: SeededAssignee | null;
-    dueDate?: string | Date | null;
-  };
-  _id?: { toString(): string } | string;
-  title?: string;
-  priority?: string;
-  status?: string;
-  assigneeId?: SeededAssignee | null;
-  dueDate?: string | Date | null;
-}
-
-function mapTaskDocToKanbanTask(doc: TaskInputDoc) {
+function mapTaskDocToKanbanTask(doc: any) {
   if (!doc) return null;
   const plainDoc = typeof doc.toObject === "function" ? doc.toObject() : doc;
   
@@ -78,18 +55,25 @@ function mapTaskDocToKanbanTask(doc: TaskInputDoc) {
   const name = assigneeDoc?.name || "Unassigned";
   const initials = name
     .split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2) || "U";
 
+  const id = plainDoc._id ? plainDoc._id.toString() : plainDoc.id ? plainDoc.id.toString() : "";
+  const projectId = plainDoc.projectId ? plainDoc.projectId.toString() : "";
+  const workspaceId = plainDoc.workspaceId ? plainDoc.workspaceId.toString() : "";
+
   return {
-    id: plainDoc._id?.toString() || "",
+    id,
+    projectId,
+    workspaceId,
     title: plainDoc.title || "",
+    description: plainDoc.description || "",
     priority: (plainDoc.priority || "medium") as "low" | "medium" | "high" | "urgent",
     status: (plainDoc.status || "todo") as "todo" | "in-progress" | "in-review" | "done",
     assignee: {
-      id: assigneeDoc?._id?.toString() || "unassigned",
+      id: assigneeDoc?._id ? assigneeDoc._id.toString() : assigneeDoc?.id ? assigneeDoc.id.toString() : "unassigned",
       name,
       initials,
       avatarUrl: assigneeDoc?.avatarUrl || undefined,

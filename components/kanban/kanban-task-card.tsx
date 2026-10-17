@@ -59,10 +59,12 @@ export function KanbanTaskCard({
 function TaskCardFace({ task, onClick }: { task: KanbanTask; onClick?: () => void }) {
   const due = task.dueDate ? new Date(task.dueDate) : null;
   const dueLabel = due ? due.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+  const priority = (task.priority && PRIORITY_STYLES[task.priority] ? task.priority : "medium") as KanbanPriority;
+  const assignee = task.assignee || { name: "Unassigned", initials: "U" };
 
   return (
     <article
-      onClick={(e) => {
+      onClick={() => {
         // Prevent click if dragging
         if (onClick) {
           onClick();
@@ -78,10 +80,10 @@ function TaskCardFace({ task, onClick }: { task: KanbanTask; onClick?: () => voi
         <span
           className={cn(
             "inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
-            PRIORITY_STYLES[task.priority],
+            PRIORITY_STYLES[priority],
           )}
         >
-          {PRIORITY_LABEL[task.priority]}
+          {PRIORITY_LABEL[priority]}
         </span>
 
         <div className="ml-auto flex items-center gap-2">
@@ -97,9 +99,9 @@ function TaskCardFace({ task, onClick }: { task: KanbanTask; onClick?: () => voi
           )}
           <span
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-[10px] font-semibold text-primary-foreground ring-1 ring-border/60"
-            title={task.assignee.name}
+            title={assignee.name}
           >
-            {task.assignee.initials}
+            {assignee.initials || assignee.name?.slice(0, 2).toUpperCase() || "U"}
           </span>
         </div>
       </div>

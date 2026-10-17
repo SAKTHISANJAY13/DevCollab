@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, Plus } from "lucide-react";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import type { KanbanTask } from "@/types";
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ interface CreateTaskModalProps {
   projectId: string;
   defaultStatus: string;
   members: any[];
+  onTaskCreated?: (task: KanbanTask) => void;
 }
 
 export function CreateTaskModal({
@@ -27,6 +29,7 @@ export function CreateTaskModal({
   projectId,
   defaultStatus,
   members,
+  onTaskCreated,
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -36,6 +39,13 @@ export function CreateTaskModal({
   const [dueDate, setDueDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setStatus(defaultStatus || "todo");
+      setError("");
+    }
+  }, [isOpen, defaultStatus]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,8 +61,8 @@ export function CreateTaskModal({
         body: JSON.stringify({
           workspaceId,
           projectId,
-          title,
-          description,
+          title: title.trim(),
+          description: description.trim(),
           status,
           priority,
           assigneeId: assigneeId || undefined,
@@ -65,17 +75,22 @@ export function CreateTaskModal({
         throw new Error(data.error || "Failed to create task");
       }
 
+      // Notify parent component immediately with the created task
+      if (onTaskCreated && data.task) {
+        onTaskCreated(data.task);
+      }
+
       // Reset fields
       setTitle("");
       setDescription("");
-      setStatus(defaultStatus);
+      setStatus(defaultStatus || "todo");
       setPriority("medium");
       setAssigneeId("");
       setDueDate("");
       onClose(false);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Something went wrong");
+      console.error("Failed to create task:", err);
+      setError(err.message || "Something went wrong creating task");
     } finally {
       setLoading(false);
     }

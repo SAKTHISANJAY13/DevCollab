@@ -12,10 +12,10 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const [isAgentOpen, setIsAgentOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground antialiased select-none">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground antialiased">
       {/* Main workspace layout content */}
       <div
-        className={`relative flex flex-col h-full transition-all duration-300 ease-in-out ${
+        className={`relative flex flex-col h-full min-h-0 transition-all duration-300 ease-in-out ${
           isAgentOpen ? "w-[82%]" : "w-full"
         }`}
       >
@@ -34,7 +34,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
         </div>
 
         {/* Existing child layout frames */}
-        <div className="flex-1 overflow-hidden min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <DashboardFrame isAgentOpen={isAgentOpen}>{children}</DashboardFrame>
         </div>
       </div>

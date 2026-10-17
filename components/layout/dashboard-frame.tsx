@@ -24,8 +24,8 @@ export function DashboardFrame({ children, isAgentOpen }: DashboardFrameProps) {
   }, [mobileOpen]);
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-[260px] shrink-0 flex-col border-r border-border/70 bg-secondary/30 lg:flex">
+    <div className="flex h-full min-h-0 w-full flex-1 overflow-hidden">
+      <aside className="hidden w-[260px] shrink-0 flex-col border-r border-border/70 bg-secondary/30 lg:flex h-full min-h-0">
         <SidebarContent />
       </aside>
 
@@ -43,10 +43,10 @@ export function DashboardFrame({ children, isAgentOpen }: DashboardFrameProps) {
         </>
       ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col h-full min-h-0 overflow-hidden">
         <Topbar onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto bg-background px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <div className="mx-auto max-w-6xl">{children}</div>
+        <main className="flex-1 overflow-y-auto bg-background px-4 py-6 sm:px-6 lg:px-8 lg:py-8 min-h-0">
+          <div className="mx-auto max-w-6xl w-full">{children}</div>
         </main>
       </div>
 

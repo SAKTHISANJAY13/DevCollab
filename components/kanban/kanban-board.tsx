@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   closestCorners,
   DndContext,
@@ -18,7 +18,7 @@ import {
   arrayMove,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { FolderKanban, Loader2, Plus, Sparkle } from "lucide-react";
+import { FolderKanban, Loader2, Plus } from "lucide-react";
 
 import { KanbanColumn } from "@/components/kanban/kanban-column";
 import { KanbanTaskCard } from "@/components/kanban/kanban-task-card";
@@ -66,6 +66,11 @@ export function KanbanBoard() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [projectsLoading, setProjectsLoading] = useState(true);
 
+  const selectedProjectIdRef = useRef(selectedProjectId);
+  useEffect(() => {
+    selectedProjectIdRef.current = selectedProjectId;
+  }, [selectedProjectId]);
+
   const { socket, isConnected } = useSocket({
     projectId: selectedProjectId || undefined,
   });
@@ -90,12 +95,41 @@ export function KanbanBoard() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  // Immediate state update helper (used by both local modal creation and realtime socket)
+  const handleTaskCreated = useCallback((newTask: KanbanTask) => {
+    if (!newTask || !newTask.id) return;
+
+    // If task belongs to a different project, don't add to this board
+    if (newTask.projectId && selectedProjectIdRef.current && newTask.projectId !== selectedProjectIdRef.current) {
+      return;
+    }
+
+    setTasks((prev) => ({
+      ...prev,
+      [newTask.id]: newTask,
+    }));
+
+    setColumns((prev) => {
+      const col = (newTask.status as KanbanColumnId) || "todo";
+      const validCol = isColumnId(col) ? col : "todo";
+
+      // Prevent duplicate task cards
+      const exists = findColumnForTask(newTask.id, prev);
+      if (exists) return prev;
+
+      return {
+        ...prev,
+        [validCol]: [newTask.id, ...(prev[validCol] || [])],
+      };
+    });
+  }, []);
+
   // 1. Fetch Workspace & Projects on Mount
   useEffect(() => {
     let active = true;
 
     // Fetch workspace details (members list)
-    fetch("/api/workspace")
+    fetch("/api/workspace?metrics=false")
       .then((res) => res.json())
       .then((data) => {
         if (!active) return;
@@ -151,7 +185,7 @@ export function KanbanBoard() {
           done: [],
         };
 
-        data.tasks.forEach((t: any) => {
+        (data.tasks || []).forEach((t: any) => {
           newTasks[t.id] = t;
           if (t.status && newColumns[t.status as KanbanColumnId]) {
             newColumns[t.status as KanbanColumnId].push(t.id);
@@ -178,24 +212,18 @@ export function KanbanBoard() {
 
     const onTaskCreated = (task: KanbanTask) => {
       console.log(`[Socket.IO Client] Event received: "taskCreated"`, task);
-      setTasks((prev) => ({ ...prev, [task.id]: task }));
-      setColumns((prev) => {
-        const col = task.status || "todo";
-        const exists = findColumnForTask(task.id, prev);
-        if (exists) return prev;
-        return {
-          ...prev,
-          [col]: [...prev[col], task.id],
-        };
-      });
+      handleTaskCreated(task);
     };
 
     const onTaskUpdated = (task: KanbanTask) => {
       console.log(`[Socket.IO Client] Event received: "taskUpdated"`, task);
+      if (task.projectId && selectedProjectIdRef.current && task.projectId !== selectedProjectIdRef.current) {
+        return;
+      }
       setTasks((prev) => ({ ...prev, [task.id]: task }));
       // Also sync column lists in case status changed from detail modal
       setColumns((prev) => {
-        const newStatus = task.status || "todo";
+        const newStatus = (task.status as KanbanColumnId) || "todo";
         const oldStatus = findColumnForTask(task.id, prev);
 
         if (oldStatus === newStatus) return prev;
@@ -205,7 +233,7 @@ export function KanbanBoard() {
           next[oldStatus] = next[oldStatus].filter((id) => id !== task.id);
         }
         if (!next[newStatus].includes(task.id)) {
-          next[newStatus] = [...next[newStatus], task.id];
+          next[newStatus] = [task.id, ...next[newStatus]];
         }
         return next;
       });
@@ -213,9 +241,12 @@ export function KanbanBoard() {
 
     const onTaskMoved = (task: KanbanTask) => {
       console.log(`[Socket.IO Client] Event received: "taskMoved"`, task);
+      if (task.projectId && selectedProjectIdRef.current && task.projectId !== selectedProjectIdRef.current) {
+        return;
+      }
       setTasks((prev) => ({ ...prev, [task.id]: task }));
       setColumns((prev) => {
-        const newStatus = task.status || "todo";
+        const newStatus = (task.status as KanbanColumnId) || "todo";
         const oldStatus = findColumnForTask(task.id, prev);
 
         if (oldStatus === newStatus) return prev;
@@ -225,14 +256,17 @@ export function KanbanBoard() {
           next[oldStatus] = next[oldStatus].filter((id) => id !== task.id);
         }
         if (!next[newStatus].includes(task.id)) {
-          next[newStatus] = [...next[newStatus], task.id];
+          next[newStatus] = [task.id, ...next[newStatus]];
         }
         return next;
       });
     };
 
-    const onTaskDeleted = ({ taskId }: { taskId: string }) => {
-      console.log(`[Socket.IO Client] Event received: "taskDeleted"`, { taskId });
+    const onTaskDeleted = ({ taskId, projectId }: { taskId: string; projectId?: string }) => {
+      console.log(`[Socket.IO Client] Event received: "taskDeleted"`, { taskId, projectId });
+      if (projectId && selectedProjectIdRef.current && projectId !== selectedProjectIdRef.current) {
+        return;
+      }
       setTasks((prev) => {
         const next = { ...prev };
         delete next[taskId];
@@ -260,7 +294,7 @@ export function KanbanBoard() {
       socket.off("taskMoved", onTaskMoved);
       socket.off("taskDeleted", onTaskDeleted);
     };
-  }, [socket]);
+  }, [socket, handleTaskCreated]);
 
   const activeTask = activeId ? tasks[activeId] : null;
 
@@ -495,14 +529,15 @@ export function KanbanBoard() {
       )}
 
       {/* Create Task Modal */}
-      {workspaceId && selectedProjectId && (
+      {(workspaceId || (projects.find((p) => (p._id || p.id) === selectedProjectId)?.workspaceId)) && selectedProjectId && (
         <CreateTaskModal
           isOpen={isCreateOpen}
           onClose={setIsCreateOpen}
-          workspaceId={workspaceId}
+          workspaceId={workspaceId || (projects.find((p) => (p._id || p.id) === selectedProjectId)?.workspaceId) || ""}
           projectId={selectedProjectId}
           defaultStatus={createTaskStatus}
           members={workspaceMembers}
+          onTaskCreated={handleTaskCreated}
         />
       )}
 

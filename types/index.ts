@@ -72,11 +72,14 @@ export type KanbanAssignee = {
 export type KanbanTask = {
   id: string;
   title: string;
+  description?: string;
   priority: KanbanPriority;
   assignee: KanbanAssignee;
   /** ISO date string */
   dueDate: string;
   status?: KanbanColumnId;
+  projectId?: string;
+  workspaceId?: string;
 };
 
 export const KANBAN_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
