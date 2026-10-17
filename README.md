@@ -1,209 +1,132 @@
 # 🚀 DevCollab — AI-Powered Real-Time Developer Collaboration SaaS
 
-> **Empowering development teams to brainstorm, organize, and execute with AI assistance and real-time synchronization.**
+> A unified workspace that combines real-time Kanban task tracking, team synchronization, and an integrated AI engineering copilot to keep software teams aligned and shipping faster.
 
 ---
 
-## 🌟 The Vision
+## 🛑 The Problem
 
-In the modern software development landscape, speed and coordination are paramount. DevCollab is designed to bridge the gap between project organization, team communication, and intelligent guidance. By blending real-time Kanban workspaces with an AI development copilot, DevCollab provides developer teams with a unified workspace that eliminates context switching and drives productivity from code brainstorming to final deployment.
+Modern software development teams lose significant speed, focus, and momentum due to **tool sprawl and communication gaps**:
 
----
+1. **Fragmented Workflows & Context Switching**: Developers are forced to constantly juggle between disconnected tools for task tracking, team communication, and code assistance. This causes lost context, scattered information, and out-of-sync project boards.
+2. **Stale Data & Delayed Task Updates**: Traditional project management platforms often lack real-time synchronization or require manual page refreshes. When teammates create, move, or edit tasks, others frequently see outdated board states, leading to duplicated effort and miscommunication.
+3. **Disjointed Technical Guidance**: When engineers hit roadblocks—whether debugging tricky code, reviewing architecture decisions, or designing data structures—they have to leave their project workflow to query generic external chatbots that have no awareness of their active development context.
 
-## 📋 Table of Contents
-1. [Overview](#-overview)
-2. [Key Features](#-key-features)
-3. [Tech Stack](#-tech-stack)
-4. [System Architecture](#-system-architecture)
-5. [Installation & Setup](#-installation--setup)
-6. [Environment Variables](#-environment-variables)
-7. [AI Integration](#-ai-integration)
-8. [Future Roadmap](#-future-roadmap)
-9. [Deployment](#-deployment)
-10. [Team & Contributions](#-team--contributions)
-11. [License](#-license)
+**DevCollab solves this** by unifying real-time drag-and-drop Kanban boards, instant live synchronization across clients, and an embedded developer AI assistant directly into a single, cohesive workspace.
 
 ---
 
-## 🔍 Overview
+## 🎯 Who It’s For
 
-DevCollab is a modern, dark-themed SaaS platform tailored for engineering teams and student developers. It serves as a central hub where teams can form workspaces, design projects, track tasks on a dynamic Kanban board, chat via Socket.io channels, and leverage an integrated AI developer assistant (DevBot) powered by Llama 3.3.
+DevCollab is designed specifically for:
 
-Designed with **Next.js 15**, **TypeScript**, and **Tailwind CSS v4**, the application delivers a premium, fast, and responsive user experience. 
-
----
-
-## ✨ Key Features
-
-| Feature | Description | Status |
-| :--- | :--- | :---: |
-| **Workspace Isolation** | Create, manage, and isolate workspaces with custom URL slugs and unified settings. | `Completed` |
-| **Clerk Authentication** | Enterprise-grade security with phone, email, and social login, including highly visible OTP flow. | `Completed` |
-| **Kanban Project Boards** | High-performance task workflow supporting drag-and-drop mechanics (dnd-kit) and statuses. | `Completed` |
-| **Task Details & Comments** | Rich-text task descriptions, due date tracking, custom tags, and threaded discussion boards. | `Completed` |
-| **Team Invites & Roles** | Invite members using encrypted tokens; define roles like Admin and Member. | `Completed` |
-| **DevBot AI Assistant** | Instant developer help, DSA solving, code optimization, and context-aware platform advice. | `Completed` |
-| **Real-Time Logging** | Audit trail of member activities, workspace modifications, and task updates. | `Completed` |
-| **AI Workspace Agent** | Auto-generating tasks, project summaries, and intelligent roadmap scheduling based on logs. | `In Progress` |
+- **Software Engineering Teams & Agile Squads**: Product teams that need a lightweight, real-time board to manage sprints, track backlogs, and organize releases without heavy enterprise complexity.
+- **Startups, Hackathons & Fast-Paced Collaborators**: Remote or co-located teams that require instant workspace creation, live multi-user card updates, and zero-friction collaboration.
+- **Pair Programmers & Open Source Contributors**: Developers building features together who need real-time awareness of what teammates are working on and the ability to assign, discuss, and track tasks live.
+- **Student & Junior Developers**: Learners who benefit from an integrated, on-demand AI copilot (DevBot) to explain complex errors, suggest optimizations, and guide technical decision-making directly within their project dashboard.
 
 ---
 
-## 🛠️ Tech Stack
+## 💻 How to Run It
 
-### Frontend
-*   **Next.js 15 (App Router)** — Dynamic server rendering, optimized bundle sizes, and robust routing.
-*   **TypeScript** — Strongly typed codebase for clean, maintainable development.
-*   **Tailwind CSS v4** — High-performance utility styles using CSS-first config and premium dark mode palettes.
-*   **dnd-kit** — Dynamic, lightweight drag-and-drop primitives for Kanban boards.
-*   **Radix UI** — Accessible, unstyled component primitives (dialogs, select dropdowns, etc.).
+Follow the steps below to set up and run DevCollab locally on your machine:
 
-### Backend & Services
-*   **Next.js Route Handlers** — Optimized, stateless REST API endpoints.
-*   **Clerk Auth** — Comprehensive authentication and user profile management.
-*   **Socket.io** — Real-time event communication for chat channels and board updates.
-*   **MongoDB & Mongoose** — Schema definition, relationships, and indexing for highly flexible data representation.
-*   **Redis** — Sub-millisecond performance cache layer for sessions and rate limiting.
+### 1. Prerequisites
+
+Make sure you have the following installed on your system:
+- **Node.js** (v18.x or later) — [Download Node.js](https://nodejs.org/)
+- **npm** (comes with Node.js) or **yarn** / **pnpm**
+- **MongoDB** (A local MongoDB instance or a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster)
+- **Clerk Account** (Free tier at [clerk.com](https://clerk.com) for authentication)
+- **Redis** *(Optional)*: DevCollab features an in-memory fallback for Socket.IO when Redis is not running locally.
 
 ---
 
-## 🏗️ System Architecture
+### 2. Clone the Repository
 
-DevCollab follows a highly structured, scalable architecture that isolates layout layers without complicating routing paths:
-
-```
-├── app/                    # Next.js App Router Pages, Layouts, and API Routes
-│   ├── (auth)/             # Auth route group (sign-in, sign-up flows)
-│   ├── (dashboard)/        # Main workspace dashboard & layout shell
-│   └── api/                # REST endpoints (health checks, invites, projects, tasks, chat)
-├── components/             # UI Components
-│   ├── layout/             # Topbar, Sidebars, Dashboard shell
-│   ├── shared/             # Custom page-level blocks
-│   ├── chatbot/            # DevBot AI chat drawer
-│   ├── kanban/             # Drag-and-drop project boards
-│   └── ui/                 # Reusable primitive blocks (buttons, dialogs, dropdowns)
-├── services/               # Data Access Object (DAO) service layer
-├── lib/                    # Shared databases, utility classes, and server configurations
-└── types/                  # Shareable TypeScript domain models
-```
-
-*   **Service Layer**: All database queries are abstracted into decoupled service modules (e.g., `workspace.service.ts`), ensuring UI pages remain thin and pure.
-*   **Route Isolation**: The `(auth)` and `(dashboard)` route groups keep core authorization boundaries separated cleanly at the directory level.
-
----
-
-## ⚙️ Installation & Setup
-
-Follow these steps to run DevCollab locally on your machine:
-
-### Prerequisites
-*   **Node.js** (v18.x or later)
-*   **MongoDB** (Local instance or MongoDB Atlas Connection URI)
-*   **Redis Server** (Local instance or Upstash Connection URI)
-*   **Groq API Key** (For powering DevBot)
-
-### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/DevCollab.git
+git clone https://github.com/SAKTHISANJAY13/DevCollab.git
 cd DevCollab
 ```
 
-### 2. Install dependencies
+---
+
+### 3. Install Dependencies
+
 ```bash
 npm install
 ```
 
-### 3. Setup environment variables
-Create a `.env.local` file in the root directory and configure the variables (see [Environment Variables](#-environment-variables) below).
+---
 
-### 4. Start the development server
+### 4. Configure Environment Variables
+
+Create a `.env.local` file in the root directory:
+
+```bash
+cp .env.example .env.local
+```
+
+Open `.env.local` and configure your credentials:
+
+```ini
+# Application URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# MongoDB Database URI
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/devcollab?retryWrites=true&w=majority
+
+# Clerk Authentication (from https://dashboard.clerk.com)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+
+# Clerk Auth Routes
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard
+NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/onboarding
+
+# Real-Time & Caching (Optional for local dev)
+REDIS_URL=redis://localhost:6379
+
+# AI Integration Keys (Groq or Gemini)
+GROQ_API_KEY=gsk_...
+GEMINI_API_KEY=...
+```
+
+---
+
+### 5. Start the Development Server
+
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view your local deployment.
-
----
-
-## 🔑 Environment Variables
-
-Copy the `.env.example` file and fill in your keys:
-
-```ini
-# App Configuration
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-# Database Configuration
-MONGODB_URI=mongodb://127.0.0.1:27017/devcollab
-
-# Clerk Authentication Keys
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-
-# Clerk Route Hooks
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
-
-# Caching and Real-time Communication
-REDIS_URL=redis://localhost:6379
-
-# AI Core Engine
-GROQ_API_KEY=gsk_...
+Once started, open your browser and navigate to:
+```
+http://localhost:3000
 ```
 
 ---
 
-## 🤖 AI Integration
+### 6. Available Scripts
 
-DevCollab features **DevBot**, a floating AI developer assistant integrated directly into the workspace shell:
-
-```
-[User Message] ──> [API Endpoint /api/chat] ──> [Groq Llama-3.3-70B model] ──> [Streamed SSE Response]
-```
-
-*   **Groq API Speed**: Powered by `llama-3.3-70b-versatile` through Groq, ensuring responses stream back instantly (sub-100ms first token latency).
-*   **Developer Guardrails**: Pre-prompted to handle code optimization, clean system walkthroughs, and assist with complex DSA logic directly inside the project dashboard.
-*   **Streamed UI Responses**: Utilizes Server-Sent Events (SSE) to render incoming text in real time, creating an interactive, chat-ready workspace helper.
+| Command | Description |
+| :--- | :--- |
+| `npm run dev` | Starts the Next.js development server at `http://localhost:3000` |
+| `npm run build` | Compiles the production build |
+| `npm run start` | Starts the production server after building |
+| `npm run lint` | Runs Next.js ESLint to verify code quality |
+| `npm run typecheck` | Validates TypeScript types across the entire project (`tsc --noEmit`) |
 
 ---
 
-## 🗺️ Future Roadmap
+## 🛠️ Tech Stack Overview
 
-1.  **AI Project Roadmaps**: Introduce an intelligent agent to parse project description backlogs and automatically seed Kanban sprints with estimated tasks.
-2.  **Interactive Video/Audio Rooms**: Build voice channels using WebRTC so developers can collaborate inside the workspace without opening external software.
-3.  **Local-First Offline Support**: Enable CRDT-based offline database persistence (via IndexDB) for uninterrupted workspace activity.
-4.  **Mobile Companion App**: Responsive native app built on React Native for task tracking on the go.
-
----
-
-## 🚀 Deployment
-
-### Deploy to Vercel
-
-The easiest way to deploy your DevCollab Next.js application is to use the Vercel Platform:
-
-1.  Push your code to GitHub.
-2.  Import your repository on Vercel.
-3.  Add all the variables specified in your `.env.local` to the Vercel project environment settings.
-4.  Set the Build Command to `npm run build`.
-5.  Click **Deploy**.
-
----
-
-## 👥 Team & Contributions
-
-DevCollab is built by a dedicated group of developers aiming to streamline engineering productivity. Contributions are highly appreciated!
-
-### How to Contribute:
-1.  Fork the Repository.
-2.  Create a Feature Branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`).
-4.  Push to the Branch (`git push origin feature/AmazingFeature`).
-5.  Open a Pull Request.
-
----
-
-## 📄 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
+- **Core**: Next.js 15 (App Router), React 19, TypeScript
+- **Styling & UI**: Tailwind CSS v4, Radix UI Primitives, Lucide Icons
+- **Board Mechanics**: `@dnd-kit/core`, `@dnd-kit/sortable`
+- **Real-Time Layer**: Socket.IO, Redis Pub/Sub Broker
+- **Database & ODM**: MongoDB, Mongoose
+- **Authentication**: Clerk Auth
+- **AI Copilot**: Groq (Llama 3.3) / Google Gemini
