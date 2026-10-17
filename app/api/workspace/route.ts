@@ -20,6 +20,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ workspace: null, metrics: null }, { status: 200 });
     }
 
+    if (typeof (workspace as any).populate === "function") {
+      await (workspace as any).populate("members.userId", "name email avatarUrl");
+    }
+
     const { searchParams } = new URL(req.url);
     const includeMetrics = searchParams.get("metrics") !== "false";
 

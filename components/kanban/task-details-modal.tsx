@@ -272,11 +272,15 @@ export function TaskDetailsModal({
                   className="w-full bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground focus:outline-none"
                 >
                   <option value="">Unassigned</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
+                  {members.map((m, index) => {
+                    const memberKey = m.id || m._id || `member-${index}`;
+                    const memberValue = m.id || m._id || "";
+                    return (
+                      <option key={memberKey} value={memberValue}>
+                        {m.name || "Teammate"}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

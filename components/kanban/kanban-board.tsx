@@ -135,12 +135,15 @@ export function KanbanBoard() {
         if (!active) return;
         if (data.workspace) {
           setWorkspaceId(data.workspace._id);
-          const membersList = (data.workspace.members || []).map((m: any) => {
+          const membersList = (data.workspace.members || []).map((m: any, idx: number) => {
             const u = m.userId;
             if (!u) return null;
+            const isPopulated = typeof u === "object";
+            const id = isPopulated ? (u._id?.toString() || u.id?.toString()) : (u?.toString?.() || String(u));
+            const name = isPopulated ? (u.name || "Teammate") : "Teammate";
             return {
-              id: u._id || u.id,
-              name: u.name || "Teammate",
+              id: id || `member-${idx}`,
+              name,
             };
           }).filter(Boolean);
           setWorkspaceMembers(membersList);
@@ -466,8 +469,8 @@ export function KanbanBoard() {
             onChange={(e) => setSelectedProjectId(e.target.value)}
             className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none"
           >
-            {projects.map((p) => (
-              <option key={p._id || p.id} value={p._id || p.id}>
+            {projects.map((p, idx) => (
+              <option key={p._id || p.id || `project-${idx}`} value={p._id || p.id}>
                 {p.title || p.name}
               </option>
             ))}
