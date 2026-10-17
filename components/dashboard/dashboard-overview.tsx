@@ -39,6 +39,7 @@ import {
 import { useSocket } from "@/hooks/use-socket";
 import { workspaceService, projectService, activityService } from "@/services";
 import type { WorkspaceMetrics } from "@/services/workspace.service";
+import { useProjectModal } from "@/providers/project-modal-provider";
 
 interface DashboardOverviewProps {
   userDisplayName?: string;
@@ -112,6 +113,7 @@ export function DashboardOverview({
   const { socket } = useSocket({
     projectId: "global",
   });
+  const { openCreateModal } = useProjectModal();
 
   // Quick Action Dialog states
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
@@ -170,10 +172,17 @@ export function DashboardOverview({
     socket.on("projectUpdated", onProjectUpdated);
     socket.on("activityCreated", onActivityCreated);
 
+    const onCustomProjectCreated = () => {
+      console.log("[Dashboard] Custom event devcollab:projectCreated received");
+      fetchDashboardData();
+    };
+    window.addEventListener("devcollab:projectCreated", onCustomProjectCreated);
+
     return () => {
       socket.off("projectCreated", onProjectCreated);
       socket.off("projectUpdated", onProjectUpdated);
       socket.off("activityCreated", onActivityCreated);
+      window.removeEventListener("devcollab:projectCreated", onCustomProjectCreated);
     };
   }, [socket]);
 
@@ -401,7 +410,8 @@ export function DashboardOverview({
                 <span className="text-xs font-semibold text-foreground mt-2">Create Task</span>
               </Link>
               <button
-                onClick={() => setIsNewProjectOpen(true)}
+                type="button"
+                onClick={() => openCreateModal({ onCreated: () => fetchDashboardData() })}
                 className="flex flex-col items-center justify-center p-4 rounded-lg bg-card border border-border/40 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all text-center group cursor-pointer"
               >
                 <FolderKanban className="h-5 w-5 text-emerald-400 group-hover:scale-105 transition-transform" />

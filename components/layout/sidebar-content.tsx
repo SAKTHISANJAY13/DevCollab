@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { appConfig, dashboardNav } from "@/lib/constants";
 import { workspaceService } from "@/services/workspace.service";
+import { useProjectModal } from "@/providers/project-modal-provider";
 
 const iconMap: Record<string, LucideIcon> = {
   "layout-dashboard": LayoutDashboard,
@@ -43,6 +44,7 @@ type SidebarContentProps = {
 
 export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
   const pathname = usePathname();
+  const { openCreateModal } = useProjectModal();
   const [workspace, setWorkspace] = useState<any>(null);
   const [metrics, setMetrics] = useState<any>(null);
   const [workspaces, setWorkspaces] = useState<any[]>([]);
@@ -177,16 +179,19 @@ export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
       </nav>
 
       <div className="shrink-0 border-t border-border/60 p-3">
-        <Link href="/dashboard/projects" onClick={onNavigate}>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full justify-center gap-2 border border-border/60 bg-card/40 text-foreground hover:bg-accent"
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            New project
-          </Button>
-        </Link>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            onNavigate?.();
+            openCreateModal();
+          }}
+          className="w-full justify-center gap-2 border border-border/60 bg-card/40 text-foreground hover:bg-accent cursor-pointer"
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+          New project
+        </Button>
       </div>
     </div>
   );

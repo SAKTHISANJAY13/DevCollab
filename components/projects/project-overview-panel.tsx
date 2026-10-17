@@ -10,7 +10,10 @@ export interface ProjectDetail {
   progress: number;
   priority: "low" | "medium" | "high" | "urgent";
   status: "planning" | "active" | "paused" | "completed" | "archived";
-  dueDate: string;
+  dueDate?: string;
+  startDate?: string;
+  category?: string;
+  requirements?: string;
   tasks: Array<{
     id: string;
     title: string;
@@ -25,7 +28,7 @@ interface ProjectOverviewPanelProps {
 }
 
 export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
-  const { description, progress, priority, status, dueDate, tasks } = project;
+  const { description, progress, priority, status, dueDate, startDate, category, requirements, tasks } = project;
 
   // Task stats
   const totalTasks = tasks.length;
@@ -56,16 +59,21 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
       {/* Description & Key Details */}
       <div className="md:col-span-2 space-y-6">
         <div className="rounded-xl border border-border/40 bg-card/25 p-6 space-y-4">
-          <div>
+          <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Project Description
             </h3>
-            <p className="text-foreground text-sm leading-relaxed mt-2 whitespace-pre-wrap">
-              {description}
-            </p>
+            {category && (
+              <span className="rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-400">
+                {category}
+              </span>
+            )}
           </div>
+          <p className="text-foreground text-sm leading-relaxed mt-2 whitespace-pre-wrap">
+            {description || "No project overview description provided."}
+          </p>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-border/20 pt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-border/20 pt-4">
             <div>
               <span className="text-xs text-muted-foreground block">Project Status</span>
               <span className={cn("inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider mt-1 border px-2 py-0.5 rounded-full", statusStyles[status])}>
@@ -84,10 +92,14 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
               </span>
             </div>
             <div>
-              <span className="text-xs text-muted-foreground block">Target Completion Date</span>
+              <span className="text-xs text-muted-foreground block">Timeline</span>
               <span suppressHydrationWarning className="flex items-center gap-1.5 text-xs text-foreground mt-1 font-medium">
                 <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-                {dueDate ? new Date(dueDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "No deadline"}
+                {startDate && dueDate
+                  ? `${new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${new Date(dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  : dueDate
+                  ? `Due ${new Date(dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  : "No deadline"}
               </span>
             </div>
             <div>
@@ -98,6 +110,19 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
             </div>
           </div>
         </div>
+
+        {/* Goals & Requirements section if present */}
+        {requirements && (
+          <div className="rounded-xl border border-border/40 bg-card/25 p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="h-4 w-4 text-indigo-400" />
+              Goals & Technical Requirements
+            </h3>
+            <div className="rounded-lg border border-border/40 bg-background/50 p-4 font-mono text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+              {requirements}
+            </div>
+          </div>
+        )}
 
         {/* Task progress cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

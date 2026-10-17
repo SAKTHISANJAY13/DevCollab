@@ -11,9 +11,18 @@ export const projectService = {
 
     try {
       const docs = await ProjectModel.find({ workspaceId: new mongoose.Types.ObjectId(workspaceId) })
+        .populate("members")
         .sort({ createdAt: -1 })
         .lean({ virtuals: true });
-      return docs.map(d => ({ ...d, title: (d as any).title || d.name }));
+      return docs.map((d: any) => ({
+        ...d,
+        id: d._id.toString(),
+        _id: d._id.toString(),
+        workspaceId: d.workspaceId?.toString() || workspaceId,
+        title: d.title || d.name,
+        startDate: d.startDate ? new Date(d.startDate).toISOString().split("T")[0] : undefined,
+        dueDate: d.dueDate ? new Date(d.dueDate).toISOString().split("T")[0] : undefined,
+      }));
     } catch (err) {
       console.error("Failed to list projects from MongoDB:", err);
       throw err;
@@ -29,7 +38,15 @@ export const projectService = {
         .populate("members")
         .lean({ virtuals: true });
       if (doc) {
-        return { ...doc, title: (doc as any).title || doc.name };
+        return {
+          ...doc,
+          id: doc._id.toString(),
+          _id: doc._id.toString(),
+          workspaceId: doc.workspaceId?.toString(),
+          title: (doc as any).title || doc.name,
+          startDate: (doc as any).startDate ? new Date((doc as any).startDate).toISOString().split("T")[0] : undefined,
+          dueDate: doc.dueDate ? new Date(doc.dueDate).toISOString().split("T")[0] : undefined,
+        };
       }
       return null;
     } catch (err) {
@@ -45,7 +62,10 @@ export const projectService = {
     status?: string;
     priority?: string;
     progress?: number;
+    startDate?: string;
     dueDate?: string;
+    category?: string;
+    requirements?: string;
     members?: string[];
     user?: { name: string; initials: string; avatarUrl?: string };
     createdBy: string;
@@ -53,10 +73,18 @@ export const projectService = {
     const conn = await connectMongoose();
     if (!conn) throw new Error("Database connection failed");
 
-    const name = input.name || input.title || "Untitled Project";
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const name = (input.name || input.title || "Untitled Project").trim();
+    const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project";
 
     try {
+      // Ensure unique slug within the workspace to avoid unique index violation
+      let slug = baseSlug;
+      let counter = 1;
+      while (await ProjectModel.exists({ workspaceId: new mongoose.Types.ObjectId(workspaceId), slug })) {
+        counter++;
+        slug = `${baseSlug}-${counter}`;
+      }
+
       const memberObjectIds = (input.members || []).map(m => new mongoose.Types.ObjectId(m));
       const doc = await ProjectModel.create({
         workspaceId: new mongoose.Types.ObjectId(workspaceId),
@@ -66,13 +94,26 @@ export const projectService = {
         status: input.status || "planning",
         priority: input.priority || "medium",
         progress: input.progress || 0,
+        startDate: input.startDate ? new Date(input.startDate) : undefined,
         dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+        category: input.category || undefined,
+        requirements: input.requirements || undefined,
         members: memberObjectIds,
         createdBy: new mongoose.Types.ObjectId(input.createdBy),
       });
       
       const populated = await ProjectModel.findById(doc._id).populate("members").lean({ virtuals: true });
-      const result = { ...populated, title: (populated as any).title || populated.name };
+      if (!populated) throw new Error("Failed to retrieve created project");
+
+      const result = {
+        ...populated,
+        id: populated._id.toString(),
+        _id: populated._id.toString(),
+        workspaceId: populated.workspaceId.toString(),
+        title: (populated as any).title || populated.name,
+        startDate: (populated as any).startDate ? new Date((populated as any).startDate).toISOString().split("T")[0] : undefined,
+        dueDate: populated.dueDate ? new Date(populated.dueDate).toISOString().split("T")[0] : undefined,
+      };
       
       if (input.user) {
         await activityService.create({
@@ -99,7 +140,10 @@ export const projectService = {
     status?: string;
     priority?: string;
     progress?: number;
+    startDate?: string;
     dueDate?: string;
+    category?: string;
+    requirements?: string;
     members?: string[];
     user?: { name: string; initials: string; avatarUrl?: string };
   }) {
@@ -118,9 +162,14 @@ export const projectService = {
       if (updateInput.status !== undefined) update.status = updateInput.status;
       if (updateInput.priority !== undefined) update.priority = updateInput.priority;
       if (updateInput.progress !== undefined) update.progress = updateInput.progress;
+      if (updateInput.startDate !== undefined) {
+        update.startDate = updateInput.startDate ? new Date(updateInput.startDate) : undefined;
+      }
       if (updateInput.dueDate !== undefined) {
         update.dueDate = updateInput.dueDate ? new Date(updateInput.dueDate) : undefined;
       }
+      if (updateInput.category !== undefined) update.category = updateInput.category;
+      if (updateInput.requirements !== undefined) update.requirements = updateInput.requirements;
       if (updateInput.members !== undefined) {
         update.members = (updateInput.members || []).map(m => new mongoose.Types.ObjectId(m));
       }
@@ -132,7 +181,15 @@ export const projectService = {
       ).populate("members").lean({ virtuals: true });
 
       if (doc) {
-        const result = { ...doc, title: (doc as any).title || doc.name };
+        const result = {
+          ...doc,
+          id: doc._id.toString(),
+          _id: doc._id.toString(),
+          workspaceId: doc.workspaceId.toString(),
+          title: (doc as any).title || doc.name,
+          startDate: (doc as any).startDate ? new Date((doc as any).startDate).toISOString().split("T")[0] : undefined,
+          dueDate: doc.dueDate ? new Date(doc.dueDate).toISOString().split("T")[0] : undefined,
+        };
         if (updateInput.user) {
           await activityService.create({
             workspaceId: doc.workspaceId.toString(),

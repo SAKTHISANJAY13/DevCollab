@@ -11,7 +11,10 @@ export interface ProjectItem {
   progress: number;
   priority: "low" | "medium" | "high" | "urgent";
   status: "planning" | "active" | "paused" | "completed" | "archived";
-  dueDate: string;
+  dueDate?: string;
+  startDate?: string;
+  category?: string;
+  requirements?: string;
   members: Array<{
     id: string;
     name: string;
@@ -26,7 +29,7 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
-  const { id, title, description, progress, priority, status, dueDate, members } = project;
+  const { id, title, description, progress, priority, status, dueDate, category, members } = project;
 
   // Status mapping
   const statusStyles = {
@@ -62,10 +65,17 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-indigo-500/5 blur-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1.5 flex-1">
-          <h3 className="font-bold text-foreground text-lg group-hover:text-indigo-400 transition-colors">
-            {title}
-          </h3>
+        <div className="space-y-1.5 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-bold text-foreground text-lg group-hover:text-indigo-400 transition-colors truncate">
+              {title}
+            </h3>
+            {category && (
+              <span className="rounded-md border border-border/60 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {category}
+              </span>
+            )}
+          </div>
           <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground pr-3">
             {description}
           </p>
@@ -103,7 +113,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <div className="mt-5 flex items-center justify-between border-t border-border/30 pt-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-          <span suppressHydrationWarning>Due {new Date(dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+          <span suppressHydrationWarning>
+            {dueDate ? `Due ${new Date(dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "No deadline"}
+          </span>
         </div>
 
         {/* Member Avatar Stack */}

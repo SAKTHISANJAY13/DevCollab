@@ -115,14 +115,21 @@ export interface MockActivity {
 
 export interface MockProject {
   id: string;
+  _id?: string;
+  workspaceId?: string;
+  name?: string;
+  slug?: string;
   title: string;
   description: string;
   progress: number;
   priority: "low" | "medium" | "high" | "urgent";
-  status: "planning" | "active" | "paused" | "completed";
-  dueDate: string;
+  status: "planning" | "active" | "paused" | "completed" | "archived";
+  dueDate?: string;
+  startDate?: string;
+  category?: string;
+  requirements?: string;
   members: MockMember[];
-  tasks: MockProjectTask[];
-  activities: MockActivity[];
+  tasks?: MockProjectTask[];
+  activities?: MockActivity[];
 }
 

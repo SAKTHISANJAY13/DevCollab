@@ -6,6 +6,17 @@ export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export const PROJECT_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export type ProjectPriority = (typeof PROJECT_PRIORITIES)[number];
 
+export const PROJECT_CATEGORIES = [
+  "Web Application",
+  "Mobile App",
+  "API & Backend",
+  "DevOps / Infrastructure",
+  "Library / Package",
+  "Design System",
+  "Other",
+] as const;
+export type ProjectCategory = (typeof PROJECT_CATEGORIES)[number];
+
 export const ProjectSchema = new Schema(
   {
     workspaceId: { type: Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -15,7 +26,10 @@ export const ProjectSchema = new Schema(
     status: { type: String, enum: PROJECT_STATUSES, default: "planning", index: true },
     priority: { type: String, enum: PROJECT_PRIORITIES, default: "medium", index: true },
     progress: { type: Number, min: 0, max: 100, default: 0 },
+    startDate: { type: Date },
     dueDate: { type: Date },
+    category: { type: String, trim: true },
+    requirements: { type: String, trim: true },
     members: [{ type: Schema.Types.ObjectId, ref: "User" }],
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },
@@ -42,6 +56,9 @@ ProjectSchema.index({ workspaceId: 1, createdAt: -1 });
 
 export type ProjectDoc = InferSchemaType<typeof ProjectSchema> & {
   title?: string;
+  startDate?: Date;
+  category?: string;
+  requirements?: string;
 };
 
 export const ProjectModel = models.Project ?? model("Project", ProjectSchema);

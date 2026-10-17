@@ -46,6 +46,22 @@ export const initSocketIO = (server: NetServer) => {
       }
     });
 
+    socket.on("join-workspace", (workspaceId: string) => {
+      if (workspaceId) {
+        const room = `workspace:${workspaceId}`;
+        socket.join(room);
+        console.log(`[Socket.IO] 📥 Client ${socket.id} joined workspace room: ${room}`);
+      }
+    });
+
+    socket.on("leave-workspace", (workspaceId: string) => {
+      if (workspaceId) {
+        const room = `workspace:${workspaceId}`;
+        socket.leave(room);
+        console.log(`[Socket.IO] 📤 Client ${socket.id} left workspace room: ${room}`);
+      }
+    });
+
     socket.on("disconnect", (reason) => {
       const remainingCount = ioServer.engine.clientsCount;
       console.log(

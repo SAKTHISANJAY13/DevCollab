@@ -56,6 +56,9 @@ export function getSocketClient(options: SocketClientOptions = {}): Socket | nul
   const url = options.url ?? resolveDefaultUrl();
   const path = options.path ?? DEFAULT_PATH;
 
+  // Prime the Next.js pages/api/socket/io handler to attach Socket.IO server to HTTP server
+  fetch(path).catch(() => {});
+
   const socket = io(url, {
     path,
     addTrailingSlash: false,

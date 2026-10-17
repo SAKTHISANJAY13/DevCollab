@@ -286,16 +286,33 @@ export function KanbanBoard() {
       });
     };
 
+    const onProjectCreated = (newProject: any) => {
+      console.log(`[Socket.IO Client] Event received: "projectCreated"`, newProject);
+      fetch("/api/projects")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.projects) {
+            setProjects(data.projects);
+            setSelectedProjectId((current) => current || (data.projects[0]?._id || data.projects[0]?.id));
+          }
+        })
+        .catch(console.error);
+    };
+
     socket.on("taskCreated", onTaskCreated);
     socket.on("taskUpdated", onTaskUpdated);
     socket.on("taskMoved", onTaskMoved);
     socket.on("taskDeleted", onTaskDeleted);
+    socket.on("projectCreated", onProjectCreated);
+    window.addEventListener("devcollab:projectCreated", onProjectCreated);
 
     return () => {
       socket.off("taskCreated", onTaskCreated);
       socket.off("taskUpdated", onTaskUpdated);
       socket.off("taskMoved", onTaskMoved);
       socket.off("taskDeleted", onTaskDeleted);
+      socket.off("projectCreated", onProjectCreated);
+      window.removeEventListener("devcollab:projectCreated", onProjectCreated);
     };
   }, [socket, handleTaskCreated]);
 
