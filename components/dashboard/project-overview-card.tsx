@@ -96,22 +96,22 @@ export function ProjectOverviewCard({
       <div className="mt-5 flex items-center justify-between border-t border-border/40 pt-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5" />
-          <span>Due {deadline}</span>
+          <span suppressHydrationWarning>Due {deadline}</span>
         </div>
 
         <div className="flex items-center">
           <div className="flex -space-x-1.5 overflow-hidden">
-            {members.map((member) => (
+            {(members || []).map((member, memberIdx) => (
               <div
-                key={member.id}
-                title={member.name}
+                key={member?.id || `card-member-${id}-${memberIdx}`}
+                title={member?.name || "Member"}
                 className="inline-flex h-6 w-6 select-none items-center justify-center rounded-full border border-card bg-accent text-[9px] font-bold text-foreground ring-1 ring-border/30 hover:scale-110 hover:z-10 transition-transform cursor-help"
               >
-                {member.initials}
+                {member?.initials || "M"}
               </div>
             ))}
           </div>
-          {members.length > 0 && (
+          {(members || []).length > 0 && (
             <span className="ml-2 text-[10px] text-muted-foreground" title={`${members.length} team members`}>
               ({members.length})
             </span>

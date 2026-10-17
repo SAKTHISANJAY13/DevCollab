@@ -54,18 +54,13 @@ export async function connectMongoose() {
 
       globalCache.promise = mongoose
         .connect(uri, {
-          // Keep config minimal; override via env if needed.
           bufferCommands: false,
+          maxPoolSize: 10,
           serverSelectionTimeoutMS: 2000, // Short timeout for fast failover
         })
-        .then(async (m) => {
+        .then((m) => {
           isMockMode = false;
           globalCache.conn = m;
-          try {
-            await m.connection.collection("userkeys").dropIndex("userId_1");
-          } catch (err) {
-            // Ignore if index doesn't exist or collection doesn't exist yet
-          }
           return m;
         })
         .catch((err) => {

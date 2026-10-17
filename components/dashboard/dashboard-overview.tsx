@@ -43,6 +43,9 @@ import type { WorkspaceMetrics } from "@/services/workspace.service";
 interface DashboardOverviewProps {
   userDisplayName?: string;
   userAvatarUrl?: string;
+  initialMetrics?: WorkspaceMetrics | null;
+  initialProjects?: any[];
+  initialActivities?: any[];
 }
 
 const ACCENT_GRADIENTS = [
@@ -67,13 +70,44 @@ function formatTimeAgo(dateInput: any) {
   return `${days}d ago`;
 }
 
+function formatActivitiesList(activitiesList: any[]) {
+  return (activitiesList || []).map((a: any, idx: number) => {
+    const actionStr = a.action || "updated";
+    const type = actionStr.includes("task")
+      ? "task"
+      : actionStr.includes("project")
+      ? "project"
+      : actionStr.includes("invite") || actionStr.includes("join") || actionStr.includes("member")
+      ? "team"
+      : "system";
+
+    return {
+      id: a._id ? String(a._id) : a.id ? String(a.id) : `act-${idx}`,
+      user: {
+        name: a.user?.name || "System",
+        initials: a.user?.initials || "SYS",
+        avatarUrl: a.user?.avatarUrl,
+      },
+      action: actionStr,
+      target: a.target || "",
+      projectName: a.projectId ? "Project" : undefined,
+      timestamp: formatTimeAgo(a.timestamp || a.createdAt),
+      type,
+    };
+  });
+}
+
 export function DashboardOverview({
   userDisplayName = "Developer",
+  initialMetrics = null,
+  initialProjects = [],
+  initialActivities = [],
 }: DashboardOverviewProps) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [metrics, setMetrics] = useState<WorkspaceMetrics | null>(null);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
+  const hasInitialData = initialMetrics !== null || initialProjects.length > 0 || initialActivities.length > 0;
+  const [isLoading, setIsLoading] = useState(!hasInitialData);
+  const [metrics, setMetrics] = useState<WorkspaceMetrics | null>(initialMetrics);
+  const [projects, setProjects] = useState<any[]>(initialProjects);
+  const [activities, setActivities] = useState<any[]>(() => formatActivitiesList(initialActivities));
 
   const { socket } = useSocket({
     projectId: "global",
@@ -92,8 +126,6 @@ export function DashboardOverview({
   const fetchDashboardData = async (showLoading = false) => {
     if (showLoading) setIsLoading(true);
     try {
-      await fetch("/api/users/me");
-
       const [workspaceRes, projectsList, activitiesList] = await Promise.all([
         workspaceService.getWorkspaceWithMetrics(),
         projectService.list(),
@@ -102,32 +134,7 @@ export function DashboardOverview({
 
       setMetrics(workspaceRes.metrics);
       setProjects(projectsList);
-
-      const formattedActivities = activitiesList.map((a: any) => {
-        const actionStr = a.action || "updated";
-        const type = actionStr.includes("task")
-          ? "task"
-          : actionStr.includes("project")
-          ? "project"
-          : actionStr.includes("invite") || actionStr.includes("join") || actionStr.includes("member")
-          ? "team"
-          : "system";
-
-        return {
-          id: a._id || a.id,
-          user: {
-            name: a.user?.name || "System",
-            initials: a.user?.initials || "SYS",
-            avatarUrl: a.user?.avatarUrl,
-          },
-          action: actionStr,
-          target: a.target || "",
-          projectName: a.projectId ? "Project" : undefined,
-          timestamp: formatTimeAgo(a.timestamp || a.createdAt),
-          type,
-        };
-      });
-      setActivities(formattedActivities);
+      setActivities(formatActivitiesList(activitiesList));
     } catch (err) {
       console.error("Failed to load dashboard data:", err);
     } finally {
@@ -136,7 +143,9 @@ export function DashboardOverview({
   };
 
   useEffect(() => {
-    fetchDashboardData(true);
+    if (!hasInitialData) {
+      fetchDashboardData(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -254,7 +263,7 @@ export function DashboardOverview({
         </div>
         <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border/30 w-fit">
           <Calendar className="h-3.5 w-3.5" />
-          <span>{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</span>
+          <span suppressHydrationWarning>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</span>
         </div>
       </div>
 
@@ -336,23 +345,40 @@ export function DashboardOverview({
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {projects.map((project, idx) => {
+                  const projectId = project._id ? String(project._id) : project.id ? String(project.id) : `proj-${idx}`;
                   const mappedProj = {
-                    id: project._id || project.id,
+                    id: projectId,
                     title: project.title || project.name || "Untitled Project",
                     description: project.description || "Collaborative dev workspace project.",
                     progress: project.progress || 0,
                     status: project.status || "active",
-                    deadline: project.dueDate ? new Date(project.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "No deadline",
+                    deadline: project.dueDate ? new Date(project.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No deadline",
                     accentColor: project.accentColor || ACCENT_GRADIENTS[idx % ACCENT_GRADIENTS.length],
-                    members: (project.members || []).map((m: any) => ({
-                      id: m._id || m.id,
-                      name: m.name || "Member",
-                      initials: m.initials || "M",
-                      avatarUrl: m.avatarUrl
-                    }))
+                    members: (project.members || []).map((m: any, mIdx: number) => {
+                      const memberId =
+                        typeof m === "string"
+                          ? m
+                          : m?._id
+                            ? String(m._id)
+                            : m?.id
+                              ? String(m.id)
+                              : m?.userId
+                                ? String(m.userId)
+                                : `m-${projectId}-${mIdx}`;
+                      const name = typeof m === "object" ? (m?.name || m?.user?.name || "Member") : "Member";
+                      const initials = typeof m === "object" && m?.initials
+                        ? m.initials
+                        : name.slice(0, 2).toUpperCase() || "M";
+                      return {
+                        id: memberId,
+                        name,
+                        initials,
+                        avatarUrl: typeof m === "object" ? m?.avatarUrl : undefined,
+                      };
+                    }),
                   };
                   return (
-                    <ProjectOverviewCard key={mappedProj.id} {...mappedProj} />
+                    <ProjectOverviewCard key={projectId} {...mappedProj} />
                   );
                 })}
               </div>

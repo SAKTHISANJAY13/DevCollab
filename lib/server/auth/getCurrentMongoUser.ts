@@ -1,9 +1,10 @@
+import { cache } from "react";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { connectMongoose } from "@/lib/db/mongoose";
 import { UserModel } from "@/lib/db/models/user.model";
 import { userService } from "@/lib/server/services/user.service";
 
-export async function getCurrentMongoUser() {
+export const getCurrentMongoUser = cache(async function getCurrentMongoUser() {
   const { userId } = await auth();
   if (!userId) return null;
 
@@ -18,4 +19,4 @@ export async function getCurrentMongoUser() {
     }
   }
   return user;
-}
+});

@@ -34,6 +34,10 @@ export const TaskSchema = new Schema(
 );
 
 TaskSchema.index({ workspaceId: 1, projectId: 1, status: 1 });
+TaskSchema.index({ workspaceId: 1, status: 1 });
+TaskSchema.index({ workspaceId: 1, createdAt: 1 });
+TaskSchema.index({ workspaceId: 1, status: 1, updatedAt: 1 });
+TaskSchema.index({ workspaceId: 1, status: 1, dueDate: 1 });
 
 export type TaskDoc = InferSchemaType<typeof TaskSchema>;
 

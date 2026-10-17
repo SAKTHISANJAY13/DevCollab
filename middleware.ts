@@ -3,6 +3,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher([
   "/api/slack(.*)",
   "/api/health(.*)",
+  "/api/socket(.*)",
+  "/api/invitations(.*)",
+  "/api/chat(.*)",
 ]);
 
 const isProtectedRoute = createRouteMatcher([

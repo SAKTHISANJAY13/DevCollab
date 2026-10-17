@@ -28,48 +28,87 @@ export const workspaceService = {
     if (!conn) throw new Error("Database connection failed");
     try {
       const wId = new mongoose.Types.ObjectId(workspaceId);
-      const activeProjects = await ProjectModel.countDocuments({ workspaceId: wId, status: { $ne: "completed" } });
-      const tasksCompleted = await TaskModel.countDocuments({ workspaceId: wId, status: "done" });
-      const pendingTasks = await TaskModel.countDocuments({ workspaceId: wId, status: { $ne: "done" } });
-      const overdueTasks = await TaskModel.countDocuments({
-        workspaceId: wId,
-        status: { $ne: "done" },
-        dueDate: { $lt: new Date() }
-      });
-      
-      const workspace = await WorkspaceModel.findById(wId);
-      const totalMembers = workspace ? workspace.members.length : 1;
-      const onlineMembers = Math.max(1, Math.ceil(totalMembers * 0.75));
-
-      // Calculate velocity data for the last 7 days
-      const velocity: Array<{ name: string; completed: number; created: number }> = [];
-      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const now = new Date();
 
+      // Start of 6 days ago (7 days total including today)
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 6);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+
+      const [
+        activeProjects,
+        tasksCompleted,
+        pendingTasks,
+        overdueTasks,
+        workspace,
+        createdDaily,
+        completedDaily,
+      ] = await Promise.all([
+        ProjectModel.countDocuments({ workspaceId: wId, status: { $ne: "completed" } }),
+        TaskModel.countDocuments({ workspaceId: wId, status: "done" }),
+        TaskModel.countDocuments({ workspaceId: wId, status: { $ne: "done" } }),
+        TaskModel.countDocuments({
+          workspaceId: wId,
+          status: { $ne: "done" },
+          dueDate: { $lt: now },
+        }),
+        WorkspaceModel.findById(wId, { members: 1 }).lean(),
+        TaskModel.aggregate([
+          {
+            $match: {
+              workspaceId: wId,
+              createdAt: { $gte: sevenDaysAgo },
+            },
+          },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              count: { $sum: 1 },
+            },
+          },
+        ]),
+        TaskModel.aggregate([
+          {
+            $match: {
+              workspaceId: wId,
+              status: "done",
+              updatedAt: { $gte: sevenDaysAgo },
+            },
+          },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } },
+              count: { $sum: 1 },
+            },
+          },
+        ]),
+      ]);
+
+      const totalMembers = (workspace as any)?.members?.length || 1;
+      const onlineMembers = Math.max(1, Math.ceil(totalMembers * 0.75));
+
+      const createdMap = new Map<string, number>(
+        (createdDaily || []).map((item: any) => [item._id, item.count])
+      );
+      const completedMap = new Map<string, number>(
+        (completedDaily || []).map((item: any) => [item._id, item.count])
+      );
+
+      const velocity: Array<{ name: string; completed: number; created: number }> = [];
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
       for (let i = 6; i >= 0; i--) {
-        const d = new Date();
+        const d = new Date(now);
         d.setDate(now.getDate() - i);
-        d.setHours(0, 0, 0, 0);
-        
-        const startOfDay = d;
-        const endOfDay = new Date(d);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const createdCount = await TaskModel.countDocuments({
-          workspaceId: wId,
-          createdAt: { $gte: startOfDay, $lte: endOfDay },
-        });
-
-        const completedCount = await TaskModel.countDocuments({
-          workspaceId: wId,
-          status: "done",
-          updatedAt: { $gte: startOfDay, $lte: endOfDay },
-        });
+        const year = d.getUTCFullYear();
+        const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(d.getUTCDate()).padStart(2, "0");
+        const dateKey = `${year}-${month}-${day}`;
 
         velocity.push({
           name: days[d.getDay()],
-          completed: completedCount,
-          created: createdCount,
+          completed: completedMap.get(dateKey) || 0,
+          created: createdMap.get(dateKey) || 0,
         });
       }
 

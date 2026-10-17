@@ -23,6 +23,8 @@ export const WorkspaceSchema = new Schema(
   { timestamps: true },
 );
 
+WorkspaceSchema.index({ "members.userId": 1 });
+
 export type WorkspaceMember = {
   userId: any;
   role: WorkspaceRole;

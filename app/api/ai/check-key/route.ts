@@ -29,10 +29,14 @@ export async function GET() {
       // Auto-default first key to active
       await UserKeyModel.updateOne({ _id: keyDocs[0]._id }, { $set: { isActive: true } });
       activeProvider = keyDocs[0].provider;
+    } else if (process.env.GROQ_API_KEY) {
+      activeProvider = "groq";
     }
 
+    const hasKey = keyDocs.length > 0 || !!process.env.GROQ_API_KEY;
+
     return NextResponse.json({
-      hasKey: keyDocs.length > 0,
+      hasKey,
       activeProvider,
       savedProviders,
     }, { status: 200 });

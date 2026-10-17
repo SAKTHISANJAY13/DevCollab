@@ -58,7 +58,7 @@ export function KanbanTaskCard({
 
 function TaskCardFace({ task, onClick }: { task: KanbanTask; onClick?: () => void }) {
   const due = task.dueDate ? new Date(task.dueDate) : null;
-  const dueLabel = due ? due.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+  const dueLabel = due ? due.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
   return (
     <article
@@ -87,6 +87,7 @@ function TaskCardFace({ task, onClick }: { task: KanbanTask; onClick?: () => voi
         <div className="ml-auto flex items-center gap-2">
           {dueLabel && (
             <time
+              suppressHydrationWarning
               className="inline-flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground"
               dateTime={task.dueDate}
             >

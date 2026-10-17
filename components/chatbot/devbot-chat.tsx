@@ -259,7 +259,7 @@ export function DevBotChat({ isAgentOpen }: { isAgentOpen?: boolean }) {
               ? {
                   ...m,
                   content:
-                    "⚠️ Something went wrong. Please check your `ANTHROPIC_API_KEY` in `.env.local` and try again.",
+                    "⚠️ Something went wrong connecting to the AI assistant. Please try again.",
                 }
               : m
           )
@@ -445,7 +445,7 @@ export function DevBotChat({ isAgentOpen }: { isAgentOpen?: boolean }) {
               </button>
             </div>
             <p className="mt-1.5 text-center text-[10px] text-[#8b8b93]">
-              Powered by Claude · Enter to send · Shift+Enter for newline
+              Powered by Groq AI · Enter to send · Shift+Enter for newline
             </p>
           </div>
         </div>

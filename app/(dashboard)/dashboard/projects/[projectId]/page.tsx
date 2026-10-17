@@ -513,10 +513,9 @@ export default function ProjectDetailPage() {
                           )}
                         </div>
 
-                        {/* Due date */}
-                        <span className="text-[10px] text-muted-foreground font-mono hidden sm:inline-flex items-center gap-1">
+                        <span suppressHydrationWarning className="text-[10px] text-muted-foreground font-mono hidden sm:inline-flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {task.dueDate ? new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "No due date"}
+                          {task.dueDate ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No due date"}
                         </span>
                       </div>
                     </div>

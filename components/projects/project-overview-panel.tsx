@@ -85,9 +85,9 @@ export function ProjectOverviewPanel({ project }: ProjectOverviewPanelProps) {
             </div>
             <div>
               <span className="text-xs text-muted-foreground block">Target Completion Date</span>
-              <span className="flex items-center gap-1.5 text-xs text-foreground mt-1 font-medium">
+              <span suppressHydrationWarning className="flex items-center gap-1.5 text-xs text-foreground mt-1 font-medium">
                 <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-                {dueDate ? new Date(dueDate).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : "No deadline"}
+                {dueDate ? new Date(dueDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "No deadline"}
               </span>
             </div>
             <div>

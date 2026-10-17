@@ -17,6 +17,8 @@ export const ActivitySchema = new Schema(
   { timestamps: true },
 );
 
+ActivitySchema.index({ workspaceId: 1, timestamp: -1 });
+
 export type ActivityDoc = InferSchemaType<typeof ActivitySchema>;
 
 export const ActivityModel = models.Activity ?? model("Activity", ActivitySchema);

@@ -37,6 +37,8 @@ ProjectSchema.virtual("title")
 
 // Per-workspace unique project slug
 ProjectSchema.index({ workspaceId: 1, slug: 1 }, { unique: true });
+ProjectSchema.index({ workspaceId: 1, status: 1 });
+ProjectSchema.index({ workspaceId: 1, createdAt: -1 });
 
 export type ProjectDoc = InferSchemaType<typeof ProjectSchema> & {
   title?: string;

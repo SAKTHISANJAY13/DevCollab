@@ -49,7 +49,7 @@ export function SidebarContent({ onNavigate, className }: SidebarContentProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   useEffect(() => {
-    fetch("/api/workspace")
+    fetch("/api/workspace?metrics=false")
       .then((res) => res.json())
       .then((data) => {
         if (data.workspace) setWorkspace(data.workspace);

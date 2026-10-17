@@ -2,9 +2,8 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { redirect } from "next/navigation";
 
 import { SocketProvider } from "@/providers/socket-provider";
-import { connectMongoose } from "@/lib/db/mongoose";
-import { WorkspaceModel } from "@/lib/db/models";
 import { getCurrentMongoUser } from "@/lib/server/auth/getCurrentMongoUser";
+import { getActiveWorkspace } from "@/lib/server/auth/getActiveWorkspace";
 
 export default async function DashboardLayout({
   children,
@@ -16,8 +15,7 @@ export default async function DashboardLayout({
     redirect("/sign-in");
   }
 
-  await connectMongoose();
-  const userWorkspace = await WorkspaceModel.findOne({ "members.userId": dbUser._id });
+  const userWorkspace = await getActiveWorkspace(dbUser);
   if (!userWorkspace) {
     redirect("/onboarding");
   }

@@ -7,7 +7,7 @@ import { getActiveWorkspace } from "@/lib/server/auth/getActiveWorkspace";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentMongoUser();
     if (!user) {
@@ -20,13 +20,34 @@ export async function GET() {
       return NextResponse.json({ workspace: null, metrics: null }, { status: 200 });
     }
 
-    const metrics = await workspaceService.getMetrics(workspace._id.toString());
+    const { searchParams } = new URL(req.url);
+    const includeMetrics = searchParams.get("metrics") !== "false";
 
-    const invitations = await InvitationModel.find({
-      workspaceId: workspace._id,
-      status: "pending",
-      expiresAt: { $gt: new Date() },
-    }).populate("invitedBy", "name email");
+    let metrics = null;
+    let invitations: any[] = [];
+
+    if (includeMetrics) {
+      const [fetchedMetrics, fetchedInvitations] = await Promise.all([
+        workspaceService.getMetrics(workspace._id.toString()),
+        InvitationModel.find({
+          workspaceId: workspace._id,
+          status: "pending",
+          expiresAt: { $gt: new Date() },
+        }).populate("invitedBy", "name email"),
+      ]);
+      metrics = fetchedMetrics;
+      invitations = fetchedInvitations;
+    } else {
+      const totalMembers = workspace.members ? workspace.members.length : 1;
+      metrics = {
+        totalMembers,
+        activeProjects: 0,
+        tasksCompleted: 0,
+        pendingTasks: 0,
+        overdueTasks: 0,
+        onlineMembers: Math.max(1, Math.ceil(totalMembers * 0.75)),
+      };
+    }
 
     return NextResponse.json({
       workspace,

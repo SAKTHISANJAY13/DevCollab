@@ -59,16 +59,21 @@ export async function POST(req: NextRequest) {
       keyDoc = await UserKeyModel.findOne({ userId: String(user._id) }).lean();
     }
 
-    if (!keyDoc?.apiKey) {
-      return NextResponse.json({ error: "Missing API key. Add your key in settings." }, { status: 400 });
-    }
+    let provider: string = keyDoc?.provider || "";
+    let apiKey = "";
 
-    const provider = keyDoc.provider;
-    let apiKey: string;
-    try {
-      apiKey = decrypt(keyDoc.apiKey);
-    } catch {
-      return NextResponse.json({ error: `Saved ${provider} API key could not be decrypted. Please re-save it in settings.` }, { status: 400 });
+    if (keyDoc?.apiKey) {
+      try {
+        apiKey = decrypt(keyDoc.apiKey);
+        provider = keyDoc.provider;
+      } catch {
+        return NextResponse.json({ error: `Saved ${provider} API key could not be decrypted. Please re-save it in settings.` }, { status: 400 });
+      }
+    } else if (process.env.GROQ_API_KEY) {
+      provider = "groq";
+      apiKey = process.env.GROQ_API_KEY;
+    } else {
+      return NextResponse.json({ error: "Missing API key. Add your key in settings." }, { status: 400 });
     }
 
     // Project context (optional, but included when projectId is provided)
@@ -133,23 +138,50 @@ export async function POST(req: NextRequest) {
           contents: [{ role: "user", parts: [{ text: message }] }],
         }),
       });
-    } else {
-      let url = "https://api.openai.com/v1/chat/completions";
-      let modelName = "gpt-4o-mini";
+    } else if (provider === "groq") {
+      const groqCandidateModels = [
+        process.env.GROQ_MODEL,
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "qwen/qwen3.8-27b",
+        "llama-3.3-70b-versatile",
+      ].filter(Boolean) as string[];
 
-      if (provider === "groq") {
-        url = "https://api.groq.com/openai/v1/chat/completions";
-        modelName = "llama-3.3-70b-versatile";
+      let lastRes: Response | null = null;
+      for (const candidate of groqCandidateModels) {
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: candidate,
+            messages: [
+              { role: "system", content: context },
+              { role: "user", content: message },
+            ],
+          }),
+        });
+        lastRes = res;
+        if (res.ok) {
+          break;
+        }
+        if (res.status === 404) {
+          continue;
+        }
+        break;
       }
-
-      aiRes = await fetch(url, {
+      aiRes = lastRes!;
+    } else {
+      aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: modelName,
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: context },
             { role: "user", content: message },

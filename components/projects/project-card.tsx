@@ -103,26 +103,26 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <div className="mt-5 flex items-center justify-between border-t border-border/30 pt-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-          <span>Due {new Date(dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+          <span suppressHydrationWarning>Due {new Date(dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
         </div>
 
         {/* Member Avatar Stack */}
         <div className="flex items-center">
           <div className="flex -space-x-1.5 overflow-hidden">
-            {members.map((member) => (
+            {(members || []).map((member, memberIdx) => (
               <div
-                key={member.id}
-                title={`${member.name} - ${member.role}`}
+                key={member?.id || `proj-card-member-${id}-${memberIdx}`}
+                title={`${member?.name || "Member"} - ${member?.role || "Member"}`}
                 className={cn(
                   "inline-flex h-6 w-6 select-none items-center justify-center rounded-full border border-card text-[9px] font-bold ring-1 ring-border/30 hover:scale-110 hover:z-10 transition-all cursor-pointer",
-                  member.avatarColor || "bg-indigo-600 text-white"
+                  member?.avatarColor || "bg-indigo-600 text-white"
                 )}
               >
-                {member.initials}
+                {member?.initials || "M"}
               </div>
             ))}
           </div>
-          {members.length > 0 && (
+          {(members || []).length > 0 && (
             <span className="ml-2 text-[10px] text-muted-foreground font-medium">
               ({members.length})
             </span>
